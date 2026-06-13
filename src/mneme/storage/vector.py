@@ -66,6 +66,10 @@ class VectorIndex:
         )
         self.conn.commit()
 
+    def clear(self) -> None:
+        self.cursor.execute("DELETE FROM memories_vec")
+        self.conn.commit()
+
     def count(self) -> int:
         row = self.cursor.execute(
             "SELECT COUNT(*) AS cnt FROM memories_vec"
