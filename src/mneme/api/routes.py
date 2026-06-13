@@ -31,9 +31,13 @@ class UpdateMemoryRequest(BaseModel):
 @router.post("/v1/memories", status_code=201)
 async def create_memory(req: Request, body: CreateMemoryRequest) -> dict[str, Any]:
     store = req.app.state.store
+    try:
+        mem_type = MemoryType(body.type)
+    except ValueError:
+        raise HTTPException(status_code=422, detail=f"Invalid type: {body.type}")
     memory = Memory(
         content=body.content,
-        type=MemoryType(body.type),
+        type=mem_type,
         tags=body.tags,
         weight=body.weight,
         metadata=body.metadata,

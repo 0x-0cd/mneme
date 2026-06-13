@@ -7,6 +7,7 @@ import math
 import random
 
 import httpx
+from httpx import ASGITransport
 import pytest
 
 from mneme.api.app import create_app
@@ -80,7 +81,8 @@ def app():
 
 @pytest.fixture
 async def client(app):
-    async with httpx.AsyncClient(app=app, base_url="http://test") as ac:
+    transport = ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
 
 

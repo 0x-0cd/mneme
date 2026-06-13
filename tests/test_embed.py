@@ -9,7 +9,7 @@ class TestInit:
     def test_init_with_model_name(self):
         model = EmbeddingModel("all-MiniLM-L6-v2")
         assert model.model_name == "all-MiniLM-L6-v2"
-        assert model._model is None
+        assert model._session is None
 
     def test_default_model_name(self):
         model = EmbeddingModel()
@@ -19,7 +19,8 @@ class TestInit:
 class TestLazyLoad:
     def test_lazy_load(self):
         model = EmbeddingModel()
-        assert model._model is None
+        assert model._session is None
+        assert model._tokenizer is None
 
 
 class TestEncode:
@@ -27,6 +28,7 @@ class TestEncode:
         model = EmbeddingModel()
         result = model.encode("hello world")
         assert isinstance(result, list)
+        assert len(result) == 384
         assert all(isinstance(v, float) for v in result)
 
     def test_encode_multiple_texts(self):
@@ -35,16 +37,16 @@ class TestEncode:
         assert isinstance(result, list)
         assert len(result) == 2
         assert all(isinstance(v, list) for v in result)
+        assert all(len(v) == 384 for v in result)
         assert all(all(isinstance(x, float) for x in v) for v in result)
 
 
 class TestDims:
-    def test_dims_before_encode_is_none(self):
+    def test_dims_known_at_init(self):
         model = EmbeddingModel()
-        assert model.dims is None
+        assert model.dims == 384
 
-    def test_dims_after_encode(self):
+    def test_dims_stable_after_encode(self):
         model = EmbeddingModel()
         model.encode("test")
-        assert isinstance(model.dims, int)
-        assert model.dims > 0
+        assert model.dims == 384
