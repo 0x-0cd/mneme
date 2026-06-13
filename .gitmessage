@@ -1,0 +1,13 @@
+# <类型>(<范围>): <描述>
+# 类型: feat | fix | docs | style | refactor | perf | test | chore | ci
+# 示例: feat(core): 添加语义搜索功能
+#        fix(search): 修复关键词过滤越界问题
+#        docs: 更新 README 安装说明
+#
+# 破坏性变更: 类型后加 ! (如 feat!: ) 或在脚注中写 BREAKING CHANGE:
+#
+# 正文（可选，空一行后书写）
+#
+# 脚注（可选，空一行后书写）
+# BREAKING CHANGE: 描述破坏性变更
+# Ref: #issue_number

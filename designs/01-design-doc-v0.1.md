@@ -1,0 +1,141 @@
+# Mneme — 设计文档 v0.1
+
+> Edge-first memory for AI agents.
+> 纯离线、即插即用的 AI Agent 记忆系统。
+
+---
+
+## 1. 命名：Mneme
+
+**来源**：希腊神话 — 记忆女神谟涅墨（Mneme）
+
+在希腊神话中，最早的缪斯只有三位：**谟涅墨（Mneme，记忆）**、**墨勒忒（Melete，实践）**、**埃俄得（Aoide，歌谣）**。后来才演变为九缪斯体系。Mneme 是记忆的化身。
+
+**理由**：
+- 有意义但不装逼 — 知道的人自然懂，不知道也不影响理解
+- 短（5个字母），好拼，好搜
+- PyPI/GitHub 大概率可用
+- 发音：/ˈniːmi/（尼米）
+
+**后备方案**：如果 Mneme 被占，备选 Trace / Kernel / Cache。
+
+---
+
+## 2. MVP 功能范围
+
+### 第一版做这些 ✅
+
+| 功能 | 说明 |
+|:----|:-----|
+| **存记忆** | 文本 + 类型 + 元数据 + 标签 |
+| **搜记忆** | 语义搜索（sqlite-vec）+ BM25 关键词 + 类型过滤 |
+| **记忆类型** | fact / preference / event / conversation / skill |
+| **存储引擎** | SQLite + sqlite-vec |
+| **HTTP API** | RESTful 本地服务 |
+| **MCP 协议** | 原生支持，接入整个 MCP 生态 |
+| **CLI** | `mneme serve` 一键启动 |
+| **pip 安装** | `pip install mneme` 完事 |
+| **数据管理** | 单条删除、全部清除、软删除 |
+
+### 第一版不做 ❌
+
+| 功能 | 放到 |
+|:----|:----|
+| 睡眠计算 / AI 做梦 | V2 |
+| 矛盾检测 / 质量管理 | V1.5 |
+| 全量版本控制（git 式）| V2 |
+| 插件系统 | V2 |
+| 多用户 | 暂不考虑 |
+| Web 控制台 | 暂不考虑 |
+| 云同步 | 视需求而定 |
+
+---
+
+## 3. 数据模型
+
+```sql
+-- 核心记忆表
+CREATE TABLE memories (
+    id          TEXT PRIMARY KEY,           -- UUID v4
+    type        TEXT NOT NULL DEFAULT 'fact',  -- fact|preference|event|conversation|skill
+    content     TEXT NOT NULL,              -- 记忆原文
+    weight      REAL NOT NULL DEFAULT 1.0,  -- 重要性权重
+    metadata    TEXT DEFAULT '{}',          -- 灵活扩展字段 (JSON)
+    tags        TEXT DEFAULT '',            -- 逗号分隔标签
+    created_at  TEXT NOT NULL,              -- ISO 8601
+    updated_at  TEXT NOT NULL,              -- ISO 8601
+    version     INTEGER NOT NULL DEFAULT 1, -- 版本号（轻量版本控制）
+    superseded_by TEXT,                     -- 被替代的 (UUID, nullable)
+    deleted_at  TEXT                        -- 软删除时间戳 (nullable)
+);
+```
+
+sqlite-vec 的虚拟表自动关联 `rowid` 到 `memories.id`。
+
+---
+
+## 4. API 设计
+
+### HTTP API
+
+```
+# 记忆操作
+POST   /v1/memories            → { content, type?, tags?, weight? }
+GET    /v1/memories?q=xxx      → { results: [...] }
+         &type=fact&limit=10
+         &tags=python,agent
+GET    /v1/memories/:id        → { memory }
+PUT    /v1/memories/:id        → { content?, type?, tags?, weight? }
+DELETE /v1/memories/:id        → 软删除
+DELETE /v1/memories            → 完全清除
+
+# 系统
+GET    /v1/health              → { status: "ok" }
+GET    /v1/stats               → { total, by_type, db_size }
+```
+
+### MCP Tools
+
+| Tool | 功能 |
+|:----|:----|
+| `store_memory` | 存一条记忆 |
+| `search_memory` | 搜索记忆 |
+| `forget_memory` | 删除单条 |
+| `wipe_memories` | 清空全部 |
+| `memory_stats` | 系统统计 |
+
+MCP Resources:
+- `mneme://recent` — 查看最近记忆
+- `mneme://stats` — 查看系统统计
+
+---
+
+## 5. 安装体验
+
+```bash
+pip install mneme
+
+# 启动服务（HTTP 8089 + MCP stdio）
+mneme serve
+
+# 或者一行命令测试
+mneme add "Python 3.11 是我的主力版本"
+mneme search "python"
+```
+
+---
+
+## 6. 架构概览
+
+见 `designs/architecture.html`（架构图）。
+
+```
+Mneme Memory Service
+├── Transport Layer（HTTP API / MCP / CLI）
+├── Memory Engine
+│   ├── Store Module（写入 + 向量化）
+│   ├── Search Module（语义 + 关键词 + 过滤）
+│   └── Quality Module（V2: 矛盾/过期/修正）
+├── SQLite + sqlite-vec（持久化）
+└── Background Workers（V2: 睡眠整理）
+```
