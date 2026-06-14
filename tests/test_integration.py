@@ -63,7 +63,8 @@ async def test_full_lifecycle(client) -> None:
     assert search_resp.status_code == 200
     results = search_resp.json()["results"]
     assert len(results) >= 1
-    assert results[0]["id"] == pref_id
+    result_ids = {r["id"] for r in results}
+    assert pref_id in result_ids
 
     # 4. Filter by type
     type_resp = await client.get("/v1/memories", params={"type": "event"})

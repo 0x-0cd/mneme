@@ -67,6 +67,20 @@ class FakeEmbeddingModel:
 
     @staticmethod
     def _vec(text: str) -> list[float]:
-        seed = int(hashlib.md5(text.encode()).hexdigest()[:8], 16)
-        rng = random.Random(seed)
-        return [rng.random() for _ in range(384)]
+        """Deterministic bag-of-chars embedding.
+
+        Texts sharing more characters produce more similar vectors,
+        mimicking real embedding behavior for test purposes.
+        """
+        # Use character bigrams to capture content similarity
+        chars = text.lower()
+        vec = [0.0] * 384
+        # Simple char-based embedding: position = char code, value = frequency
+        for i, c in enumerate(chars):
+            idx = (ord(c) * 7 + i * 13) % 384
+            vec[idx] += 1.0
+        # Normalize
+        norm = math.sqrt(sum(v * v for v in vec))
+        if norm > 0:
+            vec = [v / norm for v in vec]
+        return vec
