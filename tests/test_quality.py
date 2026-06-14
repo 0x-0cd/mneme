@@ -5,9 +5,8 @@ from __future__ import annotations
 from mneme.engine.quality import ContradictionDetector, ContradictionType
 from mneme.engine.search import Searcher
 from mneme.engine.store import Store
-from mneme.engine.types import Memory, MemoryType
+from mneme.engine.types import Memory
 from mneme.storage.db import Database
-
 from tests.fakes import FakeEmbeddingModel, FakeVectorIndex
 
 
@@ -52,8 +51,8 @@ class TestDetectDirectContradiction:
 
     def test_english_antonym(self) -> None:
         detector, store, _, _, _ = make_detector()
-        m1 = store.store(Memory(content="I like coffee"))
-        m2 = store.store(Memory(content="I hate coffee"))
+        store.store(Memory(content="I like coffee"))
+        store.store(Memory(content="I hate coffee"))
         result = detector.detect()
         assert len(result) == 1
         assert result[0].type == ContradictionType.DIRECT
@@ -80,12 +79,8 @@ class TestDetectTemporalContradiction:
 
     def test_same_tags_shared_context(self) -> None:
         detector, store, _, _, _ = make_detector()
-        m1 = store.store(
-            Memory(content="我在杭州工作", tags=["location", "work"])
-        )
-        m2 = store.store(
-            Memory(content="我在上海出差", tags=["location", "work"])
-        )
+        store.store(Memory(content="我在杭州工作", tags=["location", "work"]))
+        store.store(Memory(content="我在上海出差", tags=["location", "work"]))
         result = detector.detect()
         assert len(result) >= 1
         types = {c.type for c in result}
@@ -97,7 +92,7 @@ class TestDetectSpecificMemory:
         detector, store, _, _, _ = make_detector()
         m1 = store.store(Memory(content="我喜欢咖啡"))
         m2 = store.store(Memory(content="我讨厌咖啡"))
-        m3 = store.store(Memory(content="今天天气很好"))
+        store.store(Memory(content="今天天气很好"))
         result = detector.detect(memory_id=m1.id)
         assert len(result) == 1
         c = result[0]

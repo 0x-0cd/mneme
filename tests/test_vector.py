@@ -33,9 +33,7 @@ class TestInsert:
     def test_insert_vector(self, idx):
         mid = "mem-1"
         idx.upsert(mid, _v(1.0))
-        row = idx.cursor.execute(
-            "SELECT id FROM memories_vec WHERE id=?", (mid,)
-        ).fetchone()
+        row = idx.cursor.execute("SELECT id FROM memories_vec WHERE id=?", (mid,)).fetchone()
         assert row is not None
         assert row["id"] == mid
 
@@ -43,9 +41,7 @@ class TestInsert:
         mid = "mem-1"
         idx.upsert(mid, _v(1.0))
         idx.upsert(mid, _v(2.0))
-        rows = idx.cursor.execute(
-            "SELECT id FROM memories_vec WHERE id=?", (mid,)
-        ).fetchall()
+        rows = idx.cursor.execute("SELECT id FROM memories_vec WHERE id=?", (mid,)).fetchall()
         assert len(rows) == 1
 
 
@@ -77,9 +73,7 @@ class TestDelete:
     def test_delete_vector(self, idx):
         idx.upsert("mem-1", _v(1.0))
         idx.delete("mem-1")
-        row = idx.cursor.execute(
-            "SELECT id FROM memories_vec WHERE id=?", ("mem-1",)
-        ).fetchone()
+        row = idx.cursor.execute("SELECT id FROM memories_vec WHERE id=?", ("mem-1",)).fetchone()
         assert row is None
 
 

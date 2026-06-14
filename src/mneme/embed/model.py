@@ -26,7 +26,12 @@ class EmbeddingModel:
         },
     }
 
-    def __init__(self, model_name: str = "all-MiniLM-L6-v2", cache_dir: str | None = None, max_length: int = 256):
+    def __init__(
+        self,
+        model_name: str = "all-MiniLM-L6-v2",
+        cache_dir: str | None = None,
+        max_length: int = 256,
+    ):
         self.model_name = model_name
         self.max_length = max_length
         self._model_info = self._MODEL_INFO.get(model_name)
@@ -70,7 +75,8 @@ class EmbeddingModel:
     def _find_hfhub_cached(self, repo: str, onnx_file: str) -> str | None:
         """Check if model is cached in huggingface_hub's directory format.
 
-        hf_hub_download stores files as: <cache_dir>/models--<org>--<name>/snapshots/<hash>/<filename>
+        hf_hub_download stores files as:
+        <cache_dir>/models--<org>--<name>/snapshots/<hash>/<filename>
         """
         cache_root = os.path.join(
             self._cache_dir, f"models--{repo.replace('/', '--')}", "snapshots"
@@ -109,7 +115,7 @@ class EmbeddingModel:
                 filename=onnx_file,
                 cache_dir=self._cache_dir,
             )
-        except (OSError, EnvironmentError):
+        except OSError:
             # Fallback: download the model and convert using optimum
             # For now, try raw model export
             onnx_path = self._convert_to_onnx(repo)

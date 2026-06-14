@@ -34,12 +34,19 @@ class TestAdd:
         assert "hello world" in result.output
 
     def test_add_memory_with_type_and_tags(self, runner, db_path):
-        result = runner.invoke(cli, [
-            "add", "important event",
-            "--type", "event",
-            "--tags", "urgent,work",
-            "--db", db_path,
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "add",
+                "important event",
+                "--type",
+                "event",
+                "--tags",
+                "urgent,work",
+                "--db",
+                db_path,
+            ],
+        )
         assert result.exit_code == 0
         assert "important event" in result.output
         assert "event" in result.output

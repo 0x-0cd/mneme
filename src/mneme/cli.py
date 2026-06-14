@@ -4,12 +4,11 @@ from __future__ import annotations
 
 import os
 import sys
-from typing import Any
+from typing import Any, NamedTuple
 
 import click
 from rich.console import Console
 from rich.table import Table
-from typing import NamedTuple
 
 console = Console()
 

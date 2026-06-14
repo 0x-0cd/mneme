@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
 import os
+from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI
@@ -35,7 +35,7 @@ def create_app(
     searcher = Searcher(_db, _vindex, _embed)
 
     @asynccontextmanager
-    async def lifespan(app: FastAPI) -> Any:
+    async def lifespan(_app: FastAPI) -> Any:
         yield
         _db.close()
         _vindex.close()
