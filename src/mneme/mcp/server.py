@@ -59,17 +59,11 @@ def create_mcp_server(store: Store, searcher: Searcher) -> FastMCP:
 
     @mcp.tool()
     def memory_stats() -> dict:
-        from mneme.engine.types import MemoryType
-
-        total = store.count()
-        by_type: dict[str, int] = {mt.value: 0 for mt in MemoryType}
-        for m in store.db.get_all():
-            by_type[m.type.value] = by_type.get(m.type.value, 0) + 1
-        vector_count = store.vindex.count()
+        info = store.stats()
         return {
-            "total_memories": total,
-            "by_type": by_type,
-            "vector_count": vector_count,
+            "total_memories": info["total"],
+            "by_type": info["by_type"],
+            "vector_count": info["vector_count"],
         }
 
     return mcp

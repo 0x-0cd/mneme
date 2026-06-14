@@ -33,3 +33,9 @@ class Store:
 
     def count(self) -> int:
         return self.db.count()
+
+    def stats(self) -> dict:
+        """Get memory statistics: total count, per-type, and vector count."""
+        db_stats = self.db.get_stats()
+        db_stats["vector_count"] = self.vindex.count()
+        return db_stats

@@ -143,9 +143,4 @@ async def health() -> dict[str, str]:
 @router.get("/v1/stats")
 async def stats(req: Request) -> dict[str, Any]:
     store = req.app.state.store
-    total = store.count()
-    rows = store.db.cursor.execute(
-        "SELECT type, COUNT(*) AS cnt FROM memories WHERE deleted_at IS NULL GROUP BY type"
-    ).fetchall()
-    by_type: dict[str, int] = {r["type"]: r["cnt"] for r in rows}
-    return {"total": total, "by_type": by_type}
+    return store.stats()

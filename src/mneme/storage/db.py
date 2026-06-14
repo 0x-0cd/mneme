@@ -160,3 +160,12 @@ class Database:
             "SELECT * FROM memories WHERE deleted_at IS NULL ORDER BY created_at DESC"
         ).fetchall()
         return [self._row_to_memory(r) for r in rows]
+
+    def get_stats(self) -> dict:
+        """Return total count and per-type breakdown."""
+        total = self.count()
+        rows = self.cursor.execute(
+            "SELECT type, COUNT(*) AS cnt FROM memories WHERE deleted_at IS NULL GROUP BY type"
+        ).fetchall()
+        by_type: dict[str, int] = {r["type"]: r["cnt"] for r in rows}
+        return {"total": total, "by_type": by_type}
