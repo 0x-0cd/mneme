@@ -16,7 +16,7 @@
 | 5 | routes.py:145 直接访问 `store.db.cursor` 绕过 Store 抽象层 | API | 2026-06-14 | 🟡 | ⏳ |
 | 6 | search.py:54-73 分数融合缺陷 — `semantic_weight` 参数形同虚设，关键词结果固定 0 分 | 搜索 | 2026-06-14 | 🟡 | ⏳ |
 | 7 | search.py:74-75 融合结果未按分数降序排序 | 搜索 | 2026-06-14 | 🟡 | ⏳ |
-| 8 | embed/model.py:108 返回类型 `list[float] | list[list[float]]` 迫使调用方做 isinstance 检查 | 嵌入 | 2026-06-14 | 🟡 | ⏳ |
+| 8 | embed/model.py:108 返回类型 `list[float] \| list[list[float]]` 迫使调用方做 isinstance 检查 | 嵌入 | 2026-06-14 | 🟡 | ⏳ |
 | 9 | app.py:52 模块级 `app = create_app()` 硬编码默认 db 路径 | API | 2026-06-14 | 🟡 | ⏳ |
 | 10 | cli.py:21 返回类型 `tuple[Any, Any, Any, Any, Any]` 完全抹除类型信息 | CLI | 2026-06-14 | 🟡 | ⏳ |
 | 11 | db.py:20-21 `__del__` 调用不可靠，`__init__` 失败时引发 AttributeError | 存储 | 2026-06-14 | 🟡 | ⏳ |
