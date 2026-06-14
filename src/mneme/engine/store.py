@@ -9,9 +9,7 @@ from mneme.storage.vector import VectorIndex
 
 
 class Store:
-    def __init__(
-        self, db: Database, vindex: VectorIndex, embed: EmbeddingModel
-    ) -> None:
+    def __init__(self, db: Database, vindex: VectorIndex, embed: EmbeddingModel) -> None:
         self.db = db
         self.vindex = vindex
         self.embed = embed

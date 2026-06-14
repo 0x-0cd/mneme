@@ -49,9 +49,7 @@ class VectorIndex:
         )
         self.conn.commit()
 
-    def search(
-        self, query_vector: list[float], limit: int = 20
-    ) -> list[tuple[str, float]]:
+    def search(self, query_vector: list[float], limit: int = 20) -> list[tuple[str, float]]:
         blob = self._pack(query_vector)
         rows = self.cursor.execute(
             "SELECT id, distance FROM memories_vec"
@@ -61,9 +59,7 @@ class VectorIndex:
         return [(row[0], row[1]) for row in rows]
 
     def delete(self, memory_id: str) -> None:
-        self.cursor.execute(
-            "DELETE FROM memories_vec WHERE id = ?", (memory_id,)
-        )
+        self.cursor.execute("DELETE FROM memories_vec WHERE id = ?", (memory_id,))
         self.conn.commit()
 
     def clear(self) -> None:
@@ -71,7 +67,5 @@ class VectorIndex:
         self.conn.commit()
 
     def count(self) -> int:
-        row = self.cursor.execute(
-            "SELECT COUNT(*) AS cnt FROM memories_vec"
-        ).fetchone()
+        row = self.cursor.execute("SELECT COUNT(*) AS cnt FROM memories_vec").fetchone()
         return row[0] if row else 0
