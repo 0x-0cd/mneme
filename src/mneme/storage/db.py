@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from mneme.engine.types import Memory
@@ -38,9 +38,7 @@ class Database:
                 deleted_at  TEXT
             )
         """)
-        self.cursor.execute(
-            "CREATE INDEX IF NOT EXISTS idx_memories_type ON memories(type)"
-        )
+        self.cursor.execute("CREATE INDEX IF NOT EXISTS idx_memories_type ON memories(type)")
         self.cursor.execute(
             "CREATE INDEX IF NOT EXISTS idx_memories_deleted ON memories(deleted_at)"
         )
@@ -117,7 +115,7 @@ class Database:
 
     def update(self, memory: Memory) -> None:
         row = self._memory_to_row(memory)
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         self.cursor.execute(
             """UPDATE memories
                SET content = ?, type = ?, weight = ?,
@@ -126,15 +124,20 @@ class Database:
                    superseded_by = ?
                WHERE id = ? AND deleted_at IS NULL""",
             (
-                row["content"], row["type"], row["weight"],
-                row["metadata"], row["tags"],
-                now, row["superseded_by"], memory.id,
+                row["content"],
+                row["type"],
+                row["weight"],
+                row["metadata"],
+                row["tags"],
+                now,
+                row["superseded_by"],
+                memory.id,
             ),
         )
         self.conn.commit()
 
     def soft_delete(self, memory_id: str) -> None:
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         self.cursor.execute(
             "UPDATE memories SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL",
             (now, memory_id),
