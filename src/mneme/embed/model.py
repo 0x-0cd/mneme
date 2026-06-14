@@ -84,7 +84,7 @@ class EmbeddingModel:
                 filename=onnx_file,
                 cache_dir=self._cache_dir,
             )
-        except Exception:
+        except (OSError, EnvironmentError):
             # Fallback: download the model and convert using optimum
             # For now, try raw model export
             onnx_path = self._convert_to_onnx(repo)
