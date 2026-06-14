@@ -2,68 +2,11 @@
 
 from __future__ import annotations
 
-import hashlib
-import math
-import random
-
 from mneme.engine.search import Searcher
 from mneme.engine.types import Memory
 from mneme.storage.db import Database
 
-
-class FakeVectorIndex:
-    def __init__(self) -> None:
-        self.vectors: dict[str, list[float]] = {}
-
-    def insert(self, memory_id: str, embedding: list[float]) -> None:
-        self.vectors[memory_id] = embedding
-
-    def search(
-        self, query_vector: list[float], limit: int = 20
-    ) -> list[tuple[str, float]]:
-        scored: list[tuple[str, float]] = []
-        for mid, vec in self.vectors.items():
-            dist = self._cosine_distance(query_vector, vec)
-            scored.append((mid, dist))
-        scored.sort(key=lambda x: x[1])
-        return scored[:limit]
-
-    @staticmethod
-    def _cosine_distance(a: list[float], b: list[float]) -> float:
-        dot = sum(x * y for x, y in zip(a, b))
-        na = math.sqrt(sum(x * x for x in a))
-        nb = math.sqrt(sum(x * x for x in b))
-        if na == 0 or nb == 0:
-            return 1.0
-        return 1.0 - dot / (na * nb)
-
-    def delete(self, memory_id: str) -> None:
-        self.vectors.pop(memory_id, None)
-
-    def clear(self) -> None:
-        self.vectors.clear()
-
-    def count(self) -> int:
-        return len(self.vectors)
-
-
-class FakeEmbeddingModel:
-    def __init__(self) -> None:
-        self.encoded: list[str] = []
-
-    def encode(self, text: str | list[str]) -> list[float] | list[list[float]]:
-        if isinstance(text, str):
-            self.encoded.append(text)
-            return self._vec(text)
-        for t in text:
-            self.encoded.append(t)
-        return [self._vec(t) for t in text]
-
-    @staticmethod
-    def _vec(text: str) -> list[float]:
-        seed = int(hashlib.md5(text.encode()).hexdigest()[:8], 16)
-        rng = random.Random(seed)
-        return [rng.random() for _ in range(384)]
+from tests.fakes import FakeVectorIndex, FakeEmbeddingModel
 
 
 def make_searcher() -> tuple[Searcher, Database, FakeVectorIndex, FakeEmbeddingModel]:
@@ -88,7 +31,8 @@ def test_search_keyword() -> None:
 
     results = sr.search(query="apple", semantic_weight=0)
     assert len(results) == 2
-    assert all("apple" in r.content for r in results)
+    for m, s in results:
+        assert "apple" in m.content
 
 
 def test_search_by_type() -> None:
@@ -104,7 +48,8 @@ def test_search_by_type() -> None:
 
     results = sr.search(type_filter="fact")
     assert len(results) == 2
-    assert all(r.type.value == "fact" for r in results)
+    for m, s in results:
+        assert m.type.value == "fact"
 
 
 def test_search_by_tags() -> None:
@@ -120,7 +65,8 @@ def test_search_by_tags() -> None:
 
     results = sr.search(tags=["work"])
     assert len(results) == 2
-    assert all("work" in r.tags for r in results)
+    for m, s in results:
+        assert "work" in m.tags
 
 
 def test_search_semantic() -> None:
@@ -153,7 +99,7 @@ def test_search_hybrid() -> None:
 
     results = sr.search(query="apple", semantic_weight=0.5, limit=5)
     assert len(results) <= 3
-    ids = {r.id for r in results}
+    ids = {m.id for m, s in results}
     assert m1.id in ids
     assert m2.id in ids
 

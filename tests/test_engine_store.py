@@ -2,39 +2,13 @@
 
 from __future__ import annotations
 
+import pytest
+
 from mneme.engine.store import Store
 from mneme.engine.types import Memory, MemoryType
 from mneme.storage.db import Database
 
-
-class FakeVectorIndex:
-    def __init__(self) -> None:
-        self.vectors: dict[str, list[float]] = {}
-
-    def insert(self, memory_id: str, embedding: list[float]) -> None:
-        self.vectors[memory_id] = embedding
-
-    def delete(self, memory_id: str) -> None:
-        self.vectors.pop(memory_id, None)
-
-    def clear(self) -> None:
-        self.vectors.clear()
-
-    def count(self) -> int:
-        return len(self.vectors)
-
-
-class FakeEmbeddingModel:
-    def __init__(self) -> None:
-        self.encoded: list[str] = []
-
-    def encode(self, text: str | list[str]) -> list[float] | list[list[float]]:
-        if isinstance(text, str):
-            self.encoded.append(text)
-            return [0.1] * 384
-        for t in text:
-            self.encoded.append(t)
-        return [[0.1] * 384 for _ in text]
+from tests.fakes import FakeVectorIndex, FakeEmbeddingModel
 
 
 def make_store() -> tuple[Store, Database, FakeVectorIndex, FakeEmbeddingModel]:
@@ -64,16 +38,10 @@ class TestStoreMemory:
         assert m.id in vindex.vectors
 
     def test_store_with_empty_content_fails(self) -> None:
-        try:
+        with pytest.raises(ValueError):
             Memory(content="")
-            assert False, "expected ValueError"
-        except ValueError:
-            pass
-        try:
+        with pytest.raises(ValueError):
             Memory(content="   ")
-            assert False, "expected ValueError"
-        except ValueError:
-            pass
 
 
 class TestGetMemory:
