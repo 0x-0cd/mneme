@@ -88,13 +88,15 @@ def search(
     table.add_column("ID", style="dim", no_wrap=True)
     table.add_column("Type")
     table.add_column("Content")
+    table.add_column("Score")
     table.add_column("Tags")
     table.add_column("Created")
-    for m in results:
+    for m, s in results:
         table.add_row(
             m.id[:8],
             m.type.value,
             m.content[:80] + ("..." if len(m.content) > 80 else ""),
+            f"{s:.2f}",
             ",".join(m.tags),
             m.created_at.strftime("%Y-%m-%d %H:%M"),
         )

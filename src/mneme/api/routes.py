@@ -56,10 +56,26 @@ async def list_memories(
 ) -> dict[str, Any]:
     searcher = req.app.state.searcher
     tag_list = tags.split(",") if tags else None
+    results = searcher.search(query=q, type_filter=type, tags=tag_list, limit=limit)
+    return {"results": [dict(m.to_dict(), score=round(s, 4)) for m, s in results]}
+
+
+class SearchRequest(BaseModel):
+    query: str = Field(default="")
+    limit: int = 20
+    type: str | None = None
+    tags: list[str] | None = None
+
+
+@router.post("/v1/memories/search")
+async def search_memories(req: Request, body: SearchRequest) -> dict[str, Any]:
+    """Search memories via POST (for LoCoMo benchmark compatibility)."""
+    searcher = req.app.state.searcher
+    tag_list = body.tags if body.tags else None
     results = searcher.search(
-        query=q, type_filter=type, tags=tag_list, limit=limit
+        query=body.query, type_filter=body.type, tags=tag_list, limit=body.limit
     )
-    return {"results": [m.to_dict() for m in results]}
+    return {"results": [dict(m.to_dict(), score=round(s, 4)) for m, s in results]}
 
 
 @router.get("/v1/memories/{memory_id}")
@@ -72,9 +88,7 @@ async def get_memory(memory_id: str, req: Request) -> dict[str, Any]:
 
 
 @router.put("/v1/memories/{memory_id}")
-async def update_memory(
-    memory_id: str, body: UpdateMemoryRequest, req: Request
-) -> dict[str, Any]:
+async def update_memory(memory_id: str, body: UpdateMemoryRequest, req: Request) -> dict[str, Any]:
     store = req.app.state.store
     existing = store.get(memory_id)
     if not existing:

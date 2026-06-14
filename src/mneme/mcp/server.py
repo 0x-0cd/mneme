@@ -43,7 +43,7 @@ def create_mcp_server(store: Store, searcher: Searcher) -> FastMCP:
             tags=tag_list,
             limit=limit,
         )
-        return {"results": [m.to_dict() for m in results]}
+        return {"results": [dict(m.to_dict(), score=round(s, 4)) for m, s in results]}
 
     @mcp.tool()
     def forget_memory(memory_id: str) -> dict:

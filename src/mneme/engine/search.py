@@ -9,9 +9,7 @@ from mneme.storage.vector import VectorIndex
 
 
 class Searcher:
-    def __init__(
-        self, db: Database, vindex: VectorIndex, embed: EmbeddingModel
-    ) -> None:
+    def __init__(self, db: Database, vindex: VectorIndex, embed: EmbeddingModel) -> None:
         self.db = db
         self.vindex = vindex
         self.embed = embed
@@ -23,23 +21,25 @@ class Searcher:
         tags: list[str] | None = None,
         limit: int = 20,
         semantic_weight: float = 0.5,
-    ) -> list[Memory]:
+    ) -> list[tuple[Memory, float]]:
+        """Search and return (Memory, similarity_score) pairs.
+
+        Score is a similarity value in [0, 1] (1 = most similar).
+        For keyword-only results without query, score is 0.0.
+        """
         if not query:
-            return self.db.search(
-                query=None, type_filter=type_filter, tags=tags, limit=limit
-            )
+            memories = self.db.search(query=None, type_filter=type_filter, tags=tags, limit=limit)
+            return [(m, 0.0) for m in memories]
 
-        kw_results = self.db.search(
-            query=query, type_filter=type_filter, tags=tags, limit=limit
-        )
+        kw_results = self.db.search(query=query, type_filter=type_filter, tags=tags, limit=limit)
 
-        sem_results: list[Memory] = []
+        sem_scored: list[tuple[Memory, float]] = []
         if semantic_weight > 0:
             qvec = self.embed.encode(query)
             if not isinstance(qvec, list):
                 qvec = list(qvec)
             vec_hits = self.vindex.search(qvec, limit=limit)
-            for vid, _ in vec_hits:
+            for vid, distance in vec_hits:
                 m = self.db.get(vid)
                 if m is None:
                     continue
@@ -47,21 +47,28 @@ class Searcher:
                     continue
                 if tags and not all(t in m.tags for t in tags):
                     continue
-                sem_results.append(m)
+                # Convert cosine distance to similarity score [0, 1]
+                score = 1.0 - (distance / 2.0)  # distance in [0,2], map to [1,0]
+                sem_scored.append((m, max(0.0, score)))
 
         seen: set[str] = set()
-        merged: list[Memory] = []
+        merged: list[tuple[Memory, float]] = []
+
+        # Build score lookup: max semantic score per memory
+        score_map: dict[str, float] = {}
+        for m, s in sem_scored:
+            score_map[m.id] = max(score_map.get(m.id, 0.0), s)
 
         candidates = (
-            sem_results + kw_results
+            sem_scored + [(m, 0.0) for m in kw_results]
             if semantic_weight >= 0.5
-            else kw_results + sem_results
+            else [(m, 0.0) for m in kw_results] + sem_scored
         )
 
-        for m in candidates:
+        for m, s in candidates:
             if m.id not in seen:
                 seen.add(m.id)
-                merged.append(m)
+                merged.append((m, score_map.get(m.id, s)))
                 if len(merged) >= limit:
                     break
 
