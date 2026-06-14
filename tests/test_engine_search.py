@@ -25,9 +25,9 @@ def test_search_keyword() -> None:
     db.insert(m1)
     db.insert(m2)
     db.insert(m3)
-    vi.insert(m1.id, emb.encode(m1.content))
-    vi.insert(m2.id, emb.encode(m2.content))
-    vi.insert(m3.id, emb.encode(m3.content))
+    vi.upsert(m1.id, emb.encode(m1.content))
+    vi.upsert(m2.id, emb.encode(m2.content))
+    vi.upsert(m3.id, emb.encode(m3.content))
 
     results = sr.search(query="apple", semantic_weight=0)
     assert len(results) == 2
@@ -44,7 +44,7 @@ def test_search_by_type() -> None:
     db.insert(m2)
     db.insert(m3)
     for m in (m1, m2, m3):
-        vi.insert(m.id, emb.encode(m.content))
+        vi.upsert(m.id, emb.encode(m.content))
 
     results = sr.search(type_filter="fact")
     assert len(results) == 2
@@ -61,7 +61,7 @@ def test_search_by_tags() -> None:
     db.insert(m2)
     db.insert(m3)
     for m in (m1, m2, m3):
-        vi.insert(m.id, emb.encode(m.content))
+        vi.upsert(m.id, emb.encode(m.content))
 
     results = sr.search(tags=["work"])
     assert len(results) == 2
@@ -75,8 +75,8 @@ def test_search_semantic() -> None:
     m2 = Memory(content="java programming")
     db.insert(m1)
     db.insert(m2)
-    vi.insert(m1.id, emb.encode(m1.content))
-    vi.insert(m2.id, emb.encode(m2.content))
+    vi.upsert(m1.id, emb.encode(m1.content))
+    vi.upsert(m2.id, emb.encode(m2.content))
 
     zero = sr.search(query="python", semantic_weight=0)
     assert len(zero) == 1
@@ -93,9 +93,9 @@ def test_search_hybrid() -> None:
     db.insert(m1)
     db.insert(m2)
     db.insert(m3)
-    vi.insert(m1.id, emb.encode(m1.content))
-    vi.insert(m2.id, emb.encode(m2.content))
-    vi.insert(m3.id, emb.encode(m3.content))
+    vi.upsert(m1.id, emb.encode(m1.content))
+    vi.upsert(m2.id, emb.encode(m2.content))
+    vi.upsert(m3.id, emb.encode(m3.content))
 
     results = sr.search(query="apple", semantic_weight=0.5, limit=5)
     assert len(results) <= 3
@@ -109,7 +109,7 @@ def test_search_limit() -> None:
     for i in range(10):
         m = Memory(content=f"item {i}")
         db.insert(m)
-        vi.insert(m.id, emb.encode(m.content))
+        vi.upsert(m.id, emb.encode(m.content))
 
     results = sr.search(query="item", semantic_weight=0, limit=3)
     assert len(results) == 3

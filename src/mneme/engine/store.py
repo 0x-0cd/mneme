@@ -17,7 +17,7 @@ class Store:
     def store(self, memory: Memory) -> Memory:
         embedding = self.embed.encode(memory.content)
         self.db.insert(memory)
-        self.vindex.insert(memory.id, embedding)
+        self.vindex.upsert(memory.id, embedding)
         return memory
 
     def get(self, memory_id: str) -> Memory | None:

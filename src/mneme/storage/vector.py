@@ -40,7 +40,8 @@ class VectorIndex:
     def _pack(vector: list[float]) -> bytes:
         return struct.pack(f"{len(vector)}f", *vector)
 
-    def insert(self, memory_id: str, embedding: list[float]) -> None:
+    def upsert(self, memory_id: str, embedding: list[float]) -> None:
+        # Delete first, then insert — effectively an upsert via sqlite-vec
         self.delete(memory_id)
         blob = self._pack(embedding)
         self.cursor.execute(

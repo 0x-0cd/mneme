@@ -32,7 +32,7 @@ class TestInitialize:
 class TestInsert:
     def test_insert_vector(self, idx):
         mid = "mem-1"
-        idx.insert(mid, _v(1.0))
+        idx.upsert(mid, _v(1.0))
         row = idx.cursor.execute(
             "SELECT id FROM memories_vec WHERE id=?", (mid,)
         ).fetchone()
@@ -41,8 +41,8 @@ class TestInsert:
 
     def test_insert_replaces_existing(self, idx):
         mid = "mem-1"
-        idx.insert(mid, _v(1.0))
-        idx.insert(mid, _v(2.0))
+        idx.upsert(mid, _v(1.0))
+        idx.upsert(mid, _v(2.0))
         rows = idx.cursor.execute(
             "SELECT id FROM memories_vec WHERE id=?", (mid,)
         ).fetchall()
@@ -51,9 +51,9 @@ class TestInsert:
 
 class TestSearch:
     def test_search_returns_nearest(self, idx):
-        idx.insert("mem-a", _v(1.0))
-        idx.insert("mem-b", _v(0.9))
-        idx.insert("mem-c", _v(0.0))
+        idx.upsert("mem-a", _v(1.0))
+        idx.upsert("mem-b", _v(0.9))
+        idx.upsert("mem-c", _v(0.0))
 
         results = idx.search(_v(1.0), limit=3)
         assert len(results) == 3
@@ -64,7 +64,7 @@ class TestSearch:
 
     def test_search_limit(self, idx):
         for i in range(10):
-            idx.insert(f"mem-{i}", _v(float(i) / 10.0))
+            idx.upsert(f"mem-{i}", _v(float(i) / 10.0))
         results = idx.search(_v(0.5), limit=3)
         assert len(results) == 3
 
@@ -75,7 +75,7 @@ class TestSearch:
 
 class TestDelete:
     def test_delete_vector(self, idx):
-        idx.insert("mem-1", _v(1.0))
+        idx.upsert("mem-1", _v(1.0))
         idx.delete("mem-1")
         row = idx.cursor.execute(
             "SELECT id FROM memories_vec WHERE id=?", ("mem-1",)
@@ -86,11 +86,11 @@ class TestDelete:
 class TestCount:
     def test_count(self, idx):
         assert idx.count() == 0
-        idx.insert("mem-1", _v(1.0))
-        idx.insert("mem-2", _v(0.0))
+        idx.upsert("mem-1", _v(1.0))
+        idx.upsert("mem-2", _v(0.0))
         assert idx.count() == 2
 
     def test_count_after_delete(self, idx):
-        idx.insert("mem-1", _v(1.0))
+        idx.upsert("mem-1", _v(1.0))
         idx.delete("mem-1")
         assert idx.count() == 0

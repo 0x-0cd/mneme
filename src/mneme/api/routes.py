@@ -112,7 +112,7 @@ async def update_memory(memory_id: str, body: UpdateMemoryRequest, req: Request)
         embedding = list(embedding)
 
     store.vindex.delete(memory_id)
-    store.vindex.insert(memory_id, embedding)
+    store.vindex.upsert(memory_id, embedding)
     store.db.update(existing)
 
     return existing.to_dict()

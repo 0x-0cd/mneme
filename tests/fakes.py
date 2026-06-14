@@ -16,7 +16,7 @@ class FakeVectorIndex:
     def initialize(self) -> None:
         pass
 
-    def insert(self, memory_id: str, embedding: list[float]) -> None:
+    def upsert(self, memory_id: str, embedding: list[float]) -> None:
         self.vectors[memory_id] = embedding
 
     def search(
