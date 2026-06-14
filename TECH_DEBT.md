@@ -9,8 +9,7 @@
 
 | # | 描述 | 领域 | 发现日期 | 优先级 | 状态 |
 |:-|:----|:----:|:--------:|:------:|:----:|
-| 2 | MCP 服务器无测试 — store_memory/search_memory 等 5 个工具函数零覆盖 | MCP | 2026-06-14 | 🔴 | ⏳ |
-| 3 | CLI 命令无测试 — serve/add/search/delete/clear/stats 零覆盖 | CLI | 2026-06-14 | 🔴 | ⏳ |
+| 3 | CLI 测试偶发 flaky（pytest 缓存干扰），加 -p no:cacheprovider 可稳定全过 | CLI | 2026-06-14 | 🟡 | ⏳ |
 | 17 | test_api.py:229 / test_db.py:203 / test_types.py:210 文件略超 200 行建议阈值 | 测试 | 2026-06-14 | 🟢 | ⏳ |
 
 **优先级：** 🔴 阻塞 / 🟡 高 / 🟢 低
@@ -22,6 +21,8 @@
 
 | # | 描述 | 解决日期 | 提交 |
 |:-|:----|:--------:|:----:|
+| 2 | MCP 服务器无测试 | 2026-06-14 | 20b221c |
+| 3 | CLI 命令无测试 | 2026-06-14 | —（flaky，加 no:cacheprovider 全过） |
 | 1 | 测试 Fake 类重复定义 | 2026-06-14 | 9379e3b |
 | 4 | embed/model.py:87 `except Exception` 窄化为 `(OSError, EnvironmentError)` | 2026-06-14 | 1469573 |
 | 5 | routes.py:145 `store.db.cursor` 绕过 → 改用 `store.stats()` | 2026-06-14 | f8f7097 |

@@ -67,6 +67,22 @@ class EmbeddingModel:
             providers=["CPUExecutionProvider"],
         )
 
+    def _find_hfhub_cached(self, repo: str, onnx_file: str) -> str | None:
+        """Check if model is cached in huggingface_hub's directory format.
+
+        hf_hub_download stores files as: <cache_dir>/models--<org>--<name>/snapshots/<hash>/<filename>
+        """
+        cache_root = os.path.join(
+            self._cache_dir, f"models--{repo.replace('/', '--')}", "snapshots"
+        )
+        if not os.path.isdir(cache_root):
+            return None
+        for snapshot in os.listdir(cache_root):
+            candidate = os.path.join(cache_root, snapshot, onnx_file)
+            if os.path.exists(candidate):
+                return candidate
+        return None
+
     def _resolve_onnx_path(self, onnx_file: str, repo: str) -> str:
         """Find or download the ONNX model file."""
         # Check common local locations
@@ -74,6 +90,11 @@ class EmbeddingModel:
             os.path.join(self._cache_dir, repo.replace("/", "_"), onnx_file),
             os.path.join(self._cache_dir, onnx_file),
         ]
+        # Also check huggingface_hub's cache format (models--org--name/snapshots/*/onnx/model.onnx)
+        hfhub_cache = self._find_hfhub_cached(repo, onnx_file)
+        if hfhub_cache:
+            return hfhub_cache
+
         for path in local_candidates:
             if os.path.exists(path):
                 return path
