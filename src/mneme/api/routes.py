@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from mneme.engine.types import Memory, MemoryType
@@ -50,21 +50,23 @@ async def create_memory(req: Request, body: CreateMemoryRequest) -> dict[str, An
 async def list_memories(
     req: Request,
     q: str | None = None,
-    type: str | None = None,
+    type_filter: str | None = Query(default=None, alias="type"),
     tags: str | None = None,
     limit: int = 20,
 ) -> dict[str, Any]:
     searcher = req.app.state.searcher
     tag_list = tags.split(",") if tags else None
-    results = searcher.search(query=q, type_filter=type, tags=tag_list, limit=limit)
+    results = searcher.search(query=q, type_filter=type_filter, tags=tag_list, limit=limit)
     return {"results": [dict(m.to_dict(), score=round(s, 4)) for m, s in results]}
 
 
 class SearchRequest(BaseModel):
     query: str = Field(default="")
     limit: int = 20
-    type: str | None = None
+    type_filter: str | None = Field(default=None, alias="type")
     tags: list[str] | None = None
+
+    model_config = {"populate_by_name": True}
 
 
 @router.post("/v1/memories/search")
@@ -73,7 +75,7 @@ async def search_memories(req: Request, body: SearchRequest) -> dict[str, Any]:
     searcher = req.app.state.searcher
     tag_list = body.tags if body.tags else None
     results = searcher.search(
-        query=body.query, type_filter=body.type, tags=tag_list, limit=body.limit
+        query=body.query, type_filter=body.type_filter, tags=tag_list, limit=body.limit
     )
     return {"results": [dict(m.to_dict(), score=round(s, 4)) for m, s in results]}
 
