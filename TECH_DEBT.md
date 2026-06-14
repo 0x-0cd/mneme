@@ -9,7 +9,7 @@
 
 | # | 描述 | 领域 | 发现日期 | 优先级 | 状态 |
 |:-|:----|:----:|:--------:|:------:|:----:|
-| 1 | 测试 Fake 类重复定义 — FakeVectorIndex/FakeEmbeddingModel 在 4 个测试文件中重复，共 8 份重复代码 | 测试基础设施 | 2026-06-14 | 🔴 | ⏳ |
+| 1 | 测试 Fake 类重复定义 — FakeVectorIndex/FakeEmbeddingModel 在 4 个测试文件中重复，共 8 份重复代码 | 测试基础设施 | 2026-06-14 | 🔴 | ✅ |
 | 2 | MCP 服务器无测试 — store_memory/search_memory 等 5 个工具函数零覆盖 | MCP | 2026-06-14 | 🔴 | ⏳ |
 | 3 | CLI 命令无测试 — serve/add/search/delete/clear/stats 零覆盖 | CLI | 2026-06-14 | 🔴 | ⏳ |
 | 4 | embed/model.py:87 `except Exception` 捕获所有异常，可能吞关键错误 | 嵌入 | 2026-06-14 | 🔴 | ⏳ |
@@ -45,7 +45,8 @@
 
 | # | 描述 | 解决日期 | PR |
 |:-|:----|:--------:|:--:|
-| | | | |
+| 1 | 测试 Fake 类重复定义 — 提取到 tests/fakes.py，消除 4 文件 ~190 行重复 | 2026-06-14 | 9379e3b |
+| 19 | test_engine_store.py try/except 风格 — 改为 pytest.raises | 2026-06-14 | 9379e3b |
 
 ---
 
