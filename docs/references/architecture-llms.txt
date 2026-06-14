@@ -1,0 +1,15 @@
+# Architecture Reference for LLM Coding Agents
+
+## Project Mneme - Edge-first Memory for AI Agents
+
+## Core Stack
+- Python 3.11+ asyncio
+- FastAPI (HTTP server)
+- SQLite3 + sqlite-vec (vector extension)
+- sentence-transformers / ONNX (embeddings)
+- MCP Python SDK
+
+## Key Design Decisions
+- Edge-first: fully offline, no cloud dependency
+- SQLite with vec extension: zero external infra
+- REST API + MCP dual protocol

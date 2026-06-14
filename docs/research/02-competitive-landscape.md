@@ -67,7 +67,7 @@
 - ❌ 不够成熟，社区小
 - ❌ 单人研究项目出身
 
-### MemPalace（见 03-mempalace-analysis.md）
+### MemPalace（见 [comparison-mempalace.md](../design-docs/comparison-mempalace.md)）
 
 ### ByteRover 2.0
 

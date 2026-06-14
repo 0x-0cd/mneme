@@ -1,0 +1,17 @@
+# Python Toolchain Reference for LLM Coding Agents
+
+## Package Manager
+- uv (https://docs.astral.sh/uv/)
+- pip (fallback)
+
+## Testing
+- pytest with asyncio_mode = auto
+- pytest-cov for coverage
+
+## Linting & Formatting
+- ruff for both lint and format
+- mypy with strict mode
+
+## Build
+- hatchling as build backend
+- pyproject.toml at project root
