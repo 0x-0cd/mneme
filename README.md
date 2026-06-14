@@ -191,8 +191,11 @@ mneme/
 │   └── embed/
 │       └── model.py         # ONNX Runtime 嵌入模型（无 PyTorch）
 ├── tests/                   # 90 个测试（TDD）
-├── designs/                 # 设计文档与架构图
-├── research/                # 竞品分析、基准测试、技术参考
+├── docs/                    # 设计文档、调研、架构图
+│   ├── design-docs/         #   设计文档与架构图
+│   ├── research/            #   调研、竞品分析、基准测试
+│   ├── exec-plans/          #   执行计划
+│   └── references/          #   参考文件
 ├── pyproject.toml           # 项目配置
 ├── AGENTS.md                # AI 编码助手行为准则
 └── README.md                # 本文件
@@ -243,9 +246,9 @@ Mneme 采用**分层架构**，核心分为三层：
 
 存储一条记忆时，引擎自动完成：文本嵌入 → SQLite 持久化 → 向量索引写入。搜索时，引擎融合语义距离和关键词匹配，对结果去重排序。
 
-> 详细设计文档见 [`designs/01-design-doc-v0.1.md`](designs/01-design-doc-v0.1.md)
+> 详细设计文档见 [`docs/design-docs/v0.1-core-architecture.md`](docs/design-docs/v0.1-core-architecture.md)
 >
-> 架构图见 [`designs/architecture.html`](designs/architecture.html)（浏览器打开）
+> 架构图见 [`docs/design-docs/architecture.html`](docs/design-docs/architecture.html)（浏览器打开）
 
 ---
 
@@ -299,11 +302,11 @@ test: 增加跨通道集成测试
 
 ## 📚 更多资料
 
-- [设计文档 v0.1](designs/01-design-doc-v0.1.md) — 完整的设计决策
-- [架构图](designs/architecture.html) — 交互式架构图（浏览器打开）
-- [竞品分析](research/02-competitive-landscape.md) — 市场调研
-- [基准测试](research/05-benchmarks.md) — 性能数据
-- [技术参考](research/06-technical-references.md) — 外部资料索引
+- [设计文档 v0.1](docs/design-docs/v0.1-core-architecture.md) — 完整的设计决策
+- [架构图](docs/design-docs/architecture.html) — 交互式架构图（浏览器打开）
+- [竞品分析](docs/research/02-competitive-landscape.md) — 市场调研
+- [基准测试](docs/research/05-benchmarks.md) — 性能数据
+- [技术参考](docs/research/06-technical-references.md) — 外部资料索引
 
 ---
 

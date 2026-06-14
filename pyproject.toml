@@ -51,7 +51,11 @@ line-length = 100
 target-version = "py311"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "N", "W"]
+select = ["E", "F", "I", "N", "W", "UP", "B", "SIM", "ARG"]
+ignore = ["B904", "B905"]  # raise-without-from-inside-except too verbose for MVP
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["ARG"]  # test fixtures often have unused args
 
 [tool.mypy]
 python_version = "3.11"
