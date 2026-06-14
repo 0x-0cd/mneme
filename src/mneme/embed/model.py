@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-import hashlib
 import os
-from pathlib import Path
-from typing import Any
 
 import numpy as np
 import onnxruntime as ort
@@ -31,7 +28,9 @@ class EmbeddingModel:
         self.model_name = model_name
         self._model_info = self._MODEL_INFO.get(model_name)
         if self._model_info is None:
-            raise ValueError(f"Unknown model: {model_name}. Available: {list(self._MODEL_INFO.keys())}")
+            raise ValueError(
+                f"Unknown model: {model_name}. Available: {list(self._MODEL_INFO.keys())}"
+            )
 
         self._cache_dir = cache_dir or os.path.join(
             os.path.expanduser("~"), ".cache", "mneme", "onnx"
@@ -51,7 +50,11 @@ class EmbeddingModel:
         onnx_file = self._model_info["onnx_file"]
 
         # Load tokenizer from HuggingFace (uses transformers, no PyTorch needed)
-        self._tokenizer = AutoTokenizer.from_pretrained(repo)
+        # First try local-only (no network), then fall back to online
+        try:
+            self._tokenizer = AutoTokenizer.from_pretrained(repo, local_files_only=True)
+        except OSError:
+            self._tokenizer = AutoTokenizer.from_pretrained(repo)
 
         # Try to load local ONNX model first, then download
         onnx_path = self._resolve_onnx_path(onnx_file, repo)
@@ -97,7 +100,6 @@ class EmbeddingModel:
 
         # Use optimum to export the model to ONNX
         from optimum.onnxruntime import ORTModelForFeatureExtraction
-        from optimum.exporters import TasksManager
 
         model = ORTModelForFeatureExtraction.from_pretrained(repo, export=True)
         model.save_pretrained(os.path.dirname(onnx_path))
@@ -127,7 +129,9 @@ class EmbeddingModel:
         onnx_inputs = {
             "input_ids": inputs["input_ids"].astype(np.int64),
             "attention_mask": inputs["attention_mask"].astype(np.int64),
-            "token_type_ids": inputs.get("token_type_ids", np.zeros_like(inputs["input_ids"])).astype(np.int64),
+            "token_type_ids": inputs.get(
+                "token_type_ids", np.zeros_like(inputs["input_ids"])
+            ).astype(np.int64),
         }
         # Remove token_type_ids if model doesn't use it
         model_inputs = [inp.name for inp in self._session.get_inputs()]  # type: ignore
