@@ -182,3 +182,24 @@ def stats(db: str) -> None:
     console.print(f"Total memories: [bold]{total}[/bold]")
     for t, c in sorted(by_type.items()):
         console.print(f"  {t}: {c}")
+
+
+@cli.command()
+@click.option("--dry-run", is_flag=True, default=False)
+@click.option("--db", default="memories.db", show_default=True, envvar="MNEME_DB_PATH")
+def sleep(dry_run: bool, db: str) -> None:
+    """Run memory consolidation and decay cycle."""
+    from mneme.engine.sleep import SleepEngine
+
+    db_obj, vindex, embed, store, searcher = _init_components(db)
+    engine = SleepEngine(db_obj, vindex, embed, searcher)
+    report = engine.run_cycle(dry_run=dry_run)
+
+    prefix = "[dry-run] " if dry_run else ""
+    console.print(f"[bold]{prefix}Sleep cycle complete[/bold]")
+    console.print(f"  Consolidations: {report.consolidated}")
+    console.print(f"  Decayed:        {report.decayed}")
+    console.print(f"  Below threshold:{report.forgotten}")
+    console.print(f"  Total before:   {report.total_before}")
+    console.print(f"  Total after:    {report.total_after}")
+    console.print(f"  Duration:       {report.duration_ms}ms")
