@@ -18,7 +18,8 @@ class Database:
         self.cursor = self.conn.cursor()
 
     def __del__(self) -> None:
-        self.close()
+        if hasattr(self, "conn") and self.conn is not None:
+            self.close()
 
     def initialize(self) -> None:
         if self.db_path != ":memory:":

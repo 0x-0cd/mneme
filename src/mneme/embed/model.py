@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import threading
 from typing import overload
 
 import numpy as np
@@ -25,8 +26,9 @@ class EmbeddingModel:
         },
     }
 
-    def __init__(self, model_name: str = "all-MiniLM-L6-v2", cache_dir: str | None = None):
+    def __init__(self, model_name: str = "all-MiniLM-L6-v2", cache_dir: str | None = None, max_length: int = 256):
         self.model_name = model_name
+        self.max_length = max_length
         self._model_info = self._MODEL_INFO.get(model_name)
         if self._model_info is None:
             raise ValueError(
@@ -39,6 +41,7 @@ class EmbeddingModel:
         self._session: ort.InferenceSession | None = None
         self._tokenizer: AutoTokenizer | None = None
         self._dims: int = self._model_info["dims"]
+        self._load_lock = threading.Lock()
 
     @property
     def dims(self) -> int:
@@ -117,8 +120,12 @@ class EmbeddingModel:
 
         Uses mean pooling + normalization for sentence embeddings.
         """
+        # Double-checked locking: avoid race condition when multiple
+        # threads trigger lazy load simultaneously
         if self._session is None:
-            self._load()
+            with self._load_lock:
+                if self._session is None:
+                    self._load()
 
         single = isinstance(text, str)
         texts = [text] if single else text
@@ -129,7 +136,7 @@ class EmbeddingModel:
             padding=True,
             truncation=True,
             return_tensors="np",
-            max_length=256,
+            max_length=self.max_length,
         )
 
         # Run ONNX inference

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+import os
 from typing import Any
 
 from fastapi import FastAPI
@@ -15,16 +16,17 @@ from mneme.storage.vector import VectorIndex
 
 
 def create_app(
-    db_path: str = "memories.db",
+    db_path: str | None = None,
     db: Database | None = None,
     vindex: VectorIndex | None = None,
     embed: EmbeddingModel | None = None,
 ) -> FastAPI:
-    _db = db or Database(db_path)
+    resolved_path = db_path or os.environ.get("MNEME_DB_PATH", "memories.db")
+    _db = db or Database(resolved_path)
     if db is None:
         _db.initialize()
 
-    _vindex = vindex or VectorIndex(db_path)
+    _vindex = vindex or VectorIndex(resolved_path)
     if vindex is None:
         _vindex.initialize()
 

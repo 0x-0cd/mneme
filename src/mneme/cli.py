@@ -9,8 +9,17 @@ from typing import Any
 import click
 from rich.console import Console
 from rich.table import Table
+from typing import NamedTuple
 
 console = Console()
+
+
+class _Components(NamedTuple):
+    db: Any
+    vindex: Any
+    embed: Any
+    store: Any
+    searcher: Any
 
 
 @click.group()
@@ -18,7 +27,7 @@ def cli() -> None:
     """Mneme — Edge-first memory for AI agents."""
 
 
-def _init_components(db_path: str) -> tuple[Any, Any, Any, Any, Any]:
+def _init_components(db_path: str) -> _Components:
     from mneme.embed.model import EmbeddingModel
     from mneme.engine.search import Searcher
     from mneme.engine.store import Store
@@ -32,7 +41,7 @@ def _init_components(db_path: str) -> tuple[Any, Any, Any, Any, Any]:
     embed = EmbeddingModel()
     store = Store(db, vindex, embed)
     searcher = Searcher(db, vindex, embed)
-    return db, vindex, embed, store, searcher
+    return _Components(db=db, vindex=vindex, embed=embed, store=store, searcher=searcher)
 
 
 @cli.command()
