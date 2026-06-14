@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from typing import overload
 
 import numpy as np
 import onnxruntime as ort
@@ -104,6 +105,12 @@ class EmbeddingModel:
         model = ORTModelForFeatureExtraction.from_pretrained(repo, export=True)
         model.save_pretrained(os.path.dirname(onnx_path))
         return onnx_path
+
+    @overload
+    def encode(self, text: str) -> list[float]: ...
+
+    @overload
+    def encode(self, text: list[str]) -> list[list[float]]: ...
 
     def encode(self, text: str | list[str]) -> list[float] | list[list[float]]:
         """Encode text(s) into embedding vector(s).
