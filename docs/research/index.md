@@ -7,4 +7,5 @@
 | 04-sleep-time-compute | 睡眠计算 | 参考 Letta 双 Agent 架构和艾宾浩斯遗忘曲线；MVP 阶段不做 |
 | 05-benchmarks | 基准评测 | 三大评测集：LoCoMo、LongMemEval、BEAM；MVP 目标 LoCoMo ≥ 75% |
 | 06-technical-references | 技术参考 | sqlite-vec 在 384 维、10 万向量以下性能最优；MCP 协议是 AI Agent 工具事实标准 |
-| 07-evoarena-evomem-analysis | EvoArena + EvoMem 论文分析 | 补丁式记忆范式在 LoCoMo 上 +4.8%；State Collapse 问题分析；对 Mneme 的差异化定位与借鉴点 |
+| 07-evoarena-evomem-analysis | EvoArena + EvoMem | 补丁式记忆范式在 LoCoMo 上 +4.8%；State Collapse 问题分析 |
+| 08-evolvemem-analysis | EvolveMem 自进化记忆 | LoCoMo 0.543 F1（+36.8% vs Mem0）；LLM驱动的自进化检索配置 |
