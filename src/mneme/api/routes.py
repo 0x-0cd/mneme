@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -166,3 +167,20 @@ async def get_contradictions(
 async def stats(req: Request) -> dict[str, Any]:
     store = req.app.state.store
     return store.stats()
+
+
+@router.post("/v1/sleep")
+async def trigger_sleep(req: Request, dry_run: bool = False) -> dict[str, Any]:
+    engine = req.app.state.sleep_engine
+    report = engine.run_cycle(dry_run=dry_run)
+    if not dry_run:
+        req.app.state.sleep_stats = {
+            "last_sleep": datetime.now(UTC).isoformat(),
+            "last_report": report.to_dict(),
+        }
+    return report.to_dict()
+
+
+@router.get("/v1/sleep/stats")
+async def sleep_stats(req: Request) -> dict[str, Any]:
+    return req.app.state.sleep_stats

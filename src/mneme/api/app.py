@@ -10,6 +10,7 @@ from fastapi import FastAPI
 
 from mneme.embed.model import EmbeddingModel
 from mneme.engine.search import Searcher
+from mneme.engine.sleep import SleepEngine
 from mneme.engine.store import Store
 from mneme.storage.db import Database
 from mneme.storage.vector import VectorIndex
@@ -43,6 +44,8 @@ def create_app(
     app = FastAPI(title="Mneme", lifespan=lifespan)
     app.state.store = store
     app.state.searcher = searcher
+    app.state.sleep_engine = SleepEngine(_db, _vindex, _embed, searcher)
+    app.state.sleep_stats = {"last_sleep": None, "last_report": None}
 
     from mneme.api.routes import router
 
