@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 import httpx
-from httpx import ASGITransport
 import pytest
+from httpx import ASGITransport
 
 from mneme.api.app import create_app
 from mneme.storage.db import Database
-
-from tests.fakes import FakeVectorIndex, FakeEmbeddingModel
+from tests.fakes import FakeEmbeddingModel, FakeVectorIndex
 
 
 @pytest.fixture
@@ -34,7 +33,11 @@ async def test_full_lifecycle(client) -> None:
     # 1. Create 3 memories of different types
     fact_resp = await client.post(
         "/v1/memories",
-        json={"content": "Python is a programming language", "type": "fact", "tags": ["python", "language"]},
+        json={
+            "content": "Python is a programming language",
+            "type": "fact",
+            "tags": ["python", "language"],
+        },
     )
     assert fact_resp.status_code == 201
     fact_id = fact_resp.json()["id"]
@@ -83,7 +86,10 @@ async def test_full_lifecycle(client) -> None:
     # 6. Update content
     update_resp = await client.put(
         f"/v1/memories/{fact_id}",
-        json={"content": "Python is a dynamically-typed programming language", "tags": ["python", "language", "dynamic"]},
+        json={
+            "content": "Python is a dynamically-typed programming language",
+            "tags": ["python", "language", "dynamic"],
+        },
     )
     assert update_resp.status_code == 200
     assert "dynamically-typed" in update_resp.json()["content"]

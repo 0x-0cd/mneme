@@ -5,8 +5,7 @@ from __future__ import annotations
 from mneme.engine.search import Searcher
 from mneme.engine.types import Memory
 from mneme.storage.db import Database
-
-from tests.fakes import FakeVectorIndex, FakeEmbeddingModel
+from tests.fakes import FakeEmbeddingModel, FakeVectorIndex
 
 
 def make_searcher() -> tuple[Searcher, Database, FakeVectorIndex, FakeEmbeddingModel]:
@@ -31,7 +30,7 @@ def test_search_keyword() -> None:
 
     results = sr.search(query="apple", semantic_weight=0)
     assert len(results) == 2
-    for m, s in results:
+    for m, _s in results:
         assert "apple" in m.content
 
 
@@ -48,7 +47,7 @@ def test_search_by_type() -> None:
 
     results = sr.search(type_filter="fact")
     assert len(results) == 2
-    for m, s in results:
+    for m, _s in results:
         assert m.type.value == "fact"
 
 
@@ -65,7 +64,7 @@ def test_search_by_tags() -> None:
 
     results = sr.search(tags=["work"])
     assert len(results) == 2
-    for m, s in results:
+    for m, _s in results:
         assert "work" in m.tags
 
 

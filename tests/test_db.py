@@ -141,9 +141,7 @@ class TestSoftDelete:
         m = Memory(content="will be deleted")
         db.insert(m)
         db.soft_delete(m.id)
-        row = db.cursor.execute(
-            "SELECT deleted_at FROM memories WHERE id=?", (m.id,)
-        ).fetchone()
+        row = db.cursor.execute("SELECT deleted_at FROM memories WHERE id=?", (m.id,)).fetchone()
         assert row["deleted_at"] is not None
 
     def test_soft_delete_twice_idempotent(self, db):
@@ -151,9 +149,7 @@ class TestSoftDelete:
         db.insert(m)
         db.soft_delete(m.id)
         db.soft_delete(m.id)
-        row = db.cursor.execute(
-            "SELECT deleted_at FROM memories WHERE id=?", (m.id,)
-        ).fetchone()
+        row = db.cursor.execute("SELECT deleted_at FROM memories WHERE id=?", (m.id,)).fetchone()
         assert row["deleted_at"] is not None
 
 

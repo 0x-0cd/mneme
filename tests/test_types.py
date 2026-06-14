@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -48,7 +48,7 @@ class TestMemoryCreate:
         assert m.deleted_at is None
 
     def test_with_all_fields(self):
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         m = Memory(
             content="preference data",
             type=MemoryType.PREFERENCE,
@@ -150,7 +150,7 @@ class TestMemoryToDict:
         assert restored.updated_at == original.updated_at
 
     def test_roundtrip_soft_deleted(self):
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         original = Memory(
             content="deleted item",
             deleted_at=now,
@@ -190,8 +190,8 @@ class TestMemoryFromDict:
         assert m.tags == ["tag1"]
         assert m.metadata == {"key": "val"}
         assert m.id == "explicit-id"
-        assert m.created_at == datetime(2024, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
-        assert m.updated_at == datetime(2024, 1, 2, 0, 0, 0, tzinfo=timezone.utc)
+        assert m.created_at == datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC)
+        assert m.updated_at == datetime(2024, 1, 2, 0, 0, 0, tzinfo=UTC)
         assert m.version == 5
         assert m.superseded_by == "old-id"
         assert m.deleted_at is None

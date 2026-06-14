@@ -7,8 +7,7 @@ import pytest
 from mneme.engine.store import Store
 from mneme.engine.types import Memory, MemoryType
 from mneme.storage.db import Database
-
-from tests.fakes import FakeVectorIndex, FakeEmbeddingModel
+from tests.fakes import FakeEmbeddingModel, FakeVectorIndex
 
 
 def make_store() -> tuple[Store, Database, FakeVectorIndex, FakeEmbeddingModel]:

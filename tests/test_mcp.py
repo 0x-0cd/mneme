@@ -8,8 +8,7 @@ from mneme.engine.search import Searcher
 from mneme.engine.store import Store
 from mneme.mcp.server import create_mcp_server
 from mneme.storage.db import Database
-
-from tests.fakes import FakeVectorIndex, FakeEmbeddingModel
+from tests.fakes import FakeEmbeddingModel, FakeVectorIndex
 
 
 @pytest.fixture

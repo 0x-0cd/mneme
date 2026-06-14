@@ -125,19 +125,17 @@ class ContradictionDetector:
 
     def _find_candidates(self, memory: Memory) -> list[tuple[Memory, float]]:
         search_results = self.searcher.search(query=memory.content, limit=20)
-        return [
-            (m, s)
-            for m, s in search_results
-            if m.id != memory.id and s > 0.6
-        ]
+        return [(m, s) for m, s in search_results if m.id != memory.id and s > 0.6]
 
-    def _judge(
-        self, a: Memory, b: Memory, similarity: float
-    ) -> Contradiction | None:
+    def _judge(self, a: Memory, b: Memory, similarity: float) -> Contradiction | None:
         # 1. Direct contradiction: antonym word pairs
         for word_a, word_b in ANTONYM_PAIRS:
             if word_a in a.content and word_b in b.content:
-                ctype = ContradictionType.VALUE if a.type == MemoryType.PREFERENCE else ContradictionType.DIRECT
+                ctype = (
+                    ContradictionType.VALUE
+                    if a.type == MemoryType.PREFERENCE
+                    else ContradictionType.DIRECT
+                )
                 return Contradiction(
                     memory_a_id=a.id,
                     memory_b_id=b.id,
@@ -149,7 +147,11 @@ class ContradictionDetector:
                     reason=f"反义词 '{word_a}' 与 '{word_b}' 直接对立",
                 )
             if word_b in a.content and word_a in b.content:
-                ctype = ContradictionType.VALUE if a.type == MemoryType.PREFERENCE else ContradictionType.DIRECT
+                ctype = (
+                    ContradictionType.VALUE
+                    if a.type == MemoryType.PREFERENCE
+                    else ContradictionType.DIRECT
+                )
                 return Contradiction(
                     memory_a_id=a.id,
                     memory_b_id=b.id,

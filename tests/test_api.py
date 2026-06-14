@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 import httpx
-from httpx import ASGITransport
 import pytest
+from httpx import ASGITransport
 
 from mneme.api.app import create_app
 from mneme.engine.types import Memory
 from mneme.storage.db import Database
-
-from tests.fakes import FakeVectorIndex, FakeEmbeddingModel
+from tests.fakes import FakeEmbeddingModel, FakeVectorIndex
 
 
 @pytest.fixture
@@ -39,9 +38,7 @@ def sample_memory_id(app):
 
 class TestCreateMemory:
     async def test_create_memory(self, client) -> None:
-        resp = await client.post(
-            "/v1/memories", json={"content": "hello world"}
-        )
+        resp = await client.post("/v1/memories", json={"content": "hello world"})
         assert resp.status_code == 201
         data = resp.json()
         assert data["content"] == "hello world"
@@ -68,9 +65,7 @@ class TestCreateMemory:
         assert data["metadata"] == {"key": 42}
 
     async def test_create_memory_empty_content_422(self, client) -> None:
-        resp = await client.post(
-            "/v1/memories", json={"content": ""}
-        )
+        resp = await client.post("/v1/memories", json={"content": ""})
         assert resp.status_code == 422
 
 
@@ -97,7 +92,9 @@ class TestSearchMemories:
         assert len(data["results"]) >= 1
 
     async def test_search_with_filters(self, client, sample_memory_id) -> None:
-        await client.post("/v1/memories", json={"content": "urgent work task", "tags": ["urgent", "work"]})
+        await client.post(
+            "/v1/memories", json={"content": "urgent work task", "tags": ["urgent", "work"]}
+        )
         await client.post("/v1/memories", json={"content": "fun task", "tags": ["fun"]})
         resp = await client.get("/v1/memories", params={"type": "fact", "tags": "urgent"})
         assert resp.status_code == 200

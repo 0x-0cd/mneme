@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import hashlib
 import math
-import random
 
 
 class FakeVectorIndex:
@@ -19,9 +17,7 @@ class FakeVectorIndex:
     def upsert(self, memory_id: str, embedding: list[float]) -> None:
         self.vectors[memory_id] = embedding
 
-    def search(
-        self, query_vector: list[float], limit: int = 20
-    ) -> list[tuple[str, float]]:
+    def search(self, query_vector: list[float], limit: int = 20) -> list[tuple[str, float]]:
         scored: list[tuple[str, float]] = []
         for mid, vec in self.vectors.items():
             dist = self._cosine_distance(query_vector, vec)
