@@ -140,6 +140,28 @@ async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@router.get("/v1/contradictions")
+async def get_contradictions(
+    req: Request,
+    memory_id: str | None = None,
+) -> dict[str, Any]:
+    from mneme.engine.quality import ContradictionDetector
+
+    store = req.app.state.store
+    searcher = req.app.state.searcher
+    detector = ContradictionDetector(
+        db=store.db,
+        vindex=store.vindex,
+        embed=store.embed,
+        searcher=searcher,
+    )
+    contradictions = detector.detect(memory_id=memory_id)
+    return {
+        "contradictions": [c.to_dict() for c in contradictions],
+        "total": len(contradictions),
+    }
+
+
 @router.get("/v1/stats")
 async def stats(req: Request) -> dict[str, Any]:
     store = req.app.state.store

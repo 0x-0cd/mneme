@@ -139,6 +139,38 @@ def clear(db: str, force: bool) -> None:
 
 
 @cli.command()
+@click.option("--id", "memory_id", default=None, help="检测特定记忆")
+@click.option("--db", default="memories.db", show_default=True, envvar="MNEME_DB_PATH")
+def detect(memory_id: str | None, db: str) -> None:
+    """检测记忆矛盾."""
+    from mneme.engine.quality import ContradictionDetector
+
+    db_obj, vindex, embed, store, searcher = _init_components(db)
+    detector = ContradictionDetector(db_obj, vindex, embed, searcher)
+    contradictions = detector.detect(memory_id=memory_id)
+
+    if not contradictions:
+        console.print("[green]No contradictions found.[/green]")
+        return
+
+    table = Table(title=f"Contradictions ({len(contradictions)})")
+    table.add_column("Score", style="bold")
+    table.add_column("Type")
+    table.add_column("Content A")
+    table.add_column("Content B")
+    table.add_column("Reason")
+    for c in contradictions:
+        table.add_row(
+            f"{c.score:.2f}",
+            c.type.value,
+            c.content_a[:60] + ("..." if len(c.content_a) > 60 else ""),
+            c.content_b[:60] + ("..." if len(c.content_b) > 60 else ""),
+            c.reason,
+        )
+    console.print(table)
+
+
+@cli.command()
 @click.option("--db", default="memories.db", show_default=True, envvar="MNEME_DB_PATH")
 def stats(db: str) -> None:
     """Show memory statistics."""
