@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from mneme.embed.model import EmbeddingModel
 from mneme.engine.types import Memory
 from mneme.plugin.bus import EventBus
 from mneme.plugin.event import EventType
 from mneme.storage.db import Database
 from mneme.storage.vector import VectorIndex
+
+if TYPE_CHECKING:
+    from mneme.engine.weight import WeightCalibrator
 
 
 class Store:
@@ -17,13 +22,21 @@ class Store:
         vindex: VectorIndex,
         embed: EmbeddingModel,
         event_bus: EventBus | None = None,
+        calibrator: WeightCalibrator | None = None,
     ) -> None:
         self.db = db
         self.vindex = vindex
         self.embed = embed
         self.event_bus = event_bus
+        self.calibrator = calibrator
 
     def store(self, memory: Memory) -> Memory:
+        if self.calibrator is not None and memory.weight == 1.0:
+            effective = self.calibrator.get_effective_weight(
+                memory.user_id, str(memory.type)
+            )
+            if effective != 1.0:
+                memory.weight = effective
         if self.event_bus:
             self.event_bus.emit(EventType.BEFORE_CREATE, memory=memory.to_dict())
         embedding = self.embed.encode(memory.content)

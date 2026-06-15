@@ -17,7 +17,7 @@ class CreateMemoryRequest(BaseModel):
     content: str = Field(min_length=1)
     type: str = "fact"
     tags: list[str] = Field(default_factory=list)
-    weight: float = 1.0
+    weight: float | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
     user_id: str = "default"
 
@@ -38,14 +38,16 @@ async def create_memory(req: Request, body: CreateMemoryRequest) -> dict[str, An
         mem_type = MemoryType(body.type)
     except ValueError:
         raise HTTPException(status_code=422, detail=f"Invalid type: {body.type}")
-    memory = Memory(
-        content=body.content,
-        type=mem_type,
-        tags=body.tags,
-        weight=body.weight,
-        metadata=body.metadata,
-        user_id=body.user_id,
-    )
+    memory_kwargs: dict[str, Any] = {
+        "content": body.content,
+        "type": mem_type,
+        "tags": body.tags,
+        "metadata": body.metadata,
+        "user_id": body.user_id,
+    }
+    if body.weight is not None:
+        memory_kwargs["weight"] = body.weight
+    memory = Memory(**memory_kwargs)
     store.store(memory)
     return memory.to_dict()
 
