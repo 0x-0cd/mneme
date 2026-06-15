@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import os
 import sys
 from typing import Any, NamedTuple
@@ -21,6 +22,9 @@ class _Components(NamedTuple):
     searcher: Any
 
 
+_DB_DEFAULT = os.environ.get("MNEME_DB_PATH", "memories.db")
+
+
 @click.group()
 def cli() -> None:
     """Mneme — Edge-first memory for AI agents."""
@@ -30,6 +34,7 @@ def _init_components(db_path: str) -> _Components:
     from mneme.embed.model import EmbeddingModel
     from mneme.engine.search import Searcher
     from mneme.engine.store import Store
+    from mneme.plugin.bus import EventBus
     from mneme.storage.db import Database
     from mneme.storage.vector import VectorIndex
 
@@ -38,7 +43,8 @@ def _init_components(db_path: str) -> _Components:
     vindex = VectorIndex(db_path)
     vindex.initialize()
     embed = EmbeddingModel()
-    store = Store(db, vindex, embed)
+    event_bus = EventBus()
+    store = Store(db, vindex, embed, event_bus=event_bus)
     searcher = Searcher(db, vindex, embed)
     return _Components(db=db, vindex=vindex, embed=embed, store=store, searcher=searcher)
 
@@ -46,7 +52,7 @@ def _init_components(db_path: str) -> _Components:
 @cli.command()
 @click.option("--host", default="127.0.0.1", show_default=True)
 @click.option("--port", default=8989, type=int, show_default=True)
-@click.option("--db", default="memories.db", show_default=True, envvar="MNEME_DB_PATH")
+@click.option("--db", default=_DB_DEFAULT, show_default=True, envvar="MNEME_DB_PATH")
 @click.option("--reload", is_flag=True, default=False)
 def serve(host: str, port: int, db: str, reload: bool) -> None:
     """Start the Mneme HTTP server."""
@@ -60,14 +66,15 @@ def serve(host: str, port: int, db: str, reload: bool) -> None:
 @click.argument("content")
 @click.option("--type", "type_", default="fact", show_default=True)
 @click.option("--tags", default="", help="Comma-separated tags")
-@click.option("--db", default="memories.db", show_default=True, envvar="MNEME_DB_PATH")
-def add(content: str, type_: str, tags: str, db: str) -> None:
+@click.option("--user-id", "user_id", default="default", show_default=True)
+@click.option("--db", default=_DB_DEFAULT, show_default=True, envvar="MNEME_DB_PATH")
+def add(content: str, type_: str, tags: str, user_id: str, db: str) -> None:
     """Store a new memory."""
     from mneme.engine.types import Memory, MemoryType
 
     _db, _vindex, _embed, store, _searcher = _init_components(db)
     tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else []
-    memory = Memory(content=content, type=MemoryType(type_), tags=tag_list)
+    memory = Memory(content=content, type=MemoryType(type_), tags=tag_list, user_id=user_id)
     store.store(memory)
     click.echo(memory.to_dict())
 
@@ -77,18 +84,22 @@ def add(content: str, type_: str, tags: str, db: str) -> None:
 @click.option("--type", "type_", default=None, help="Filter by memory type")
 @click.option("--tags", default=None, help="Comma-separated tags to filter")
 @click.option("--limit", default=10, type=int, show_default=True)
-@click.option("--db", default="memories.db", show_default=True, envvar="MNEME_DB_PATH")
+@click.option("--user-id", "user_id", default=None)
+@click.option("--db", default=_DB_DEFAULT, show_default=True, envvar="MNEME_DB_PATH")
 def search(
     query: str | None,
     type_: str | None,
     tags: str | None,
     limit: int,
+    user_id: str | None,
     db: str,
 ) -> None:
     """Search memories."""
     _db, _vindex, _embed, _store, searcher = _init_components(db)
     tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else None
-    results = searcher.search(query=query, type_filter=type_, tags=tag_list, limit=limit)
+    results = searcher.search(
+        query=query, type_filter=type_, tags=tag_list, limit=limit, user_id=user_id
+    )
     if not results:
         console.print("[yellow]No memories found.[/yellow]")
         return
@@ -113,7 +124,7 @@ def search(
 
 @cli.command()
 @click.argument("memory_id")
-@click.option("--db", default="memories.db", show_default=True, envvar="MNEME_DB_PATH")
+@click.option("--db", default=_DB_DEFAULT, show_default=True, envvar="MNEME_DB_PATH")
 def delete(memory_id: str, db: str) -> None:
     """Delete a memory by ID."""
     _db, _vindex, _embed, store, _searcher = _init_components(db)
@@ -126,7 +137,7 @@ def delete(memory_id: str, db: str) -> None:
 
 
 @cli.command()
-@click.option("--db", default="memories.db", show_default=True, envvar="MNEME_DB_PATH")
+@click.option("--db", default=_DB_DEFAULT, show_default=True, envvar="MNEME_DB_PATH")
 @click.option("--force", is_flag=True, default=False)
 def clear(db: str, force: bool) -> None:
     """Delete all memories."""
@@ -139,7 +150,7 @@ def clear(db: str, force: bool) -> None:
 
 @cli.command()
 @click.option("--id", "memory_id", default=None, help="检测特定记忆")
-@click.option("--db", default="memories.db", show_default=True, envvar="MNEME_DB_PATH")
+@click.option("--db", default=_DB_DEFAULT, show_default=True, envvar="MNEME_DB_PATH")
 def detect(memory_id: str | None, db: str) -> None:
     """检测记忆矛盾."""
     from mneme.engine.quality import ContradictionDetector
@@ -177,7 +188,8 @@ def detect(memory_id: str | None, db: str) -> None:
 @click.option("--sort-by", default="created_at", show_default=True)
 @click.option("--sort-order", default="desc", show_default=True)
 @click.option("--include-deleted", is_flag=True, default=False)
-@click.option("--db", default="memories.db", show_default=True, envvar="MNEME_DB_PATH")
+@click.option("--user-id", "user_id", default=None)
+@click.option("--db", default=_DB_DEFAULT, show_default=True, envvar="MNEME_DB_PATH")
 def list(
     type_: str | None,
     tags: str | None,
@@ -186,6 +198,7 @@ def list(
     sort_by: str,
     sort_order: str,
     include_deleted: bool,
+    user_id: str | None,
     db: str,
 ) -> None:
     """List memories with pagination and filtering."""
@@ -199,6 +212,7 @@ def list(
         sort_by=sort_by,
         sort_order=sort_order,
         include_deleted=include_deleted,
+        user_id=user_id,
     )
     if not memories:
         console.print("[yellow]No memories found.[/yellow]")
@@ -209,6 +223,7 @@ def list(
     table.add_column("Content")
     table.add_column("Weight")
     table.add_column("Tags")
+    table.add_column("User")
     table.add_column("Created")
     for m in memories:
         table.add_row(
@@ -217,6 +232,7 @@ def list(
             m.content[:80] + ("..." if len(m.content) > 80 else ""),
             f"{m.weight:.2f}",
             ",".join(m.tags),
+            m.user_id,
             m.created_at.strftime("%Y-%m-%d %H:%M"),
         )
     console.print(table)
@@ -224,7 +240,7 @@ def list(
 
 @cli.command()
 @click.argument("output", type=click.Path())
-@click.option("--db", default="memories.db", show_default=True, envvar="MNEME_DB_PATH")
+@click.option("--db", default=_DB_DEFAULT, show_default=True, envvar="MNEME_DB_PATH")
 def export(output: str, db: str) -> None:
     """Export all memories to a JSON file."""
     import json
@@ -238,7 +254,7 @@ def export(output: str, db: str) -> None:
 
 @cli.command("import")
 @click.argument("input_path", type=click.Path(exists=True))
-@click.option("--db", default="memories.db", show_default=True, envvar="MNEME_DB_PATH")
+@click.option("--db", default=_DB_DEFAULT, show_default=True, envvar="MNEME_DB_PATH")
 def import_memories(input_path: str, db: str) -> None:
     """Import memories from a JSON file."""
     import json
@@ -262,7 +278,7 @@ def import_memories(input_path: str, db: str) -> None:
 
 @cli.command()
 @click.argument("memory_id")
-@click.option("--db", default="memories.db", show_default=True, envvar="MNEME_DB_PATH")
+@click.option("--db", default=_DB_DEFAULT, show_default=True, envvar="MNEME_DB_PATH")
 def restore(memory_id: str, db: str) -> None:
     """Restore a soft-deleted memory."""
     _db, _vindex, _embed, _store, _searcher = _init_components(db)
@@ -275,12 +291,13 @@ def restore(memory_id: str, db: str) -> None:
 
 @cli.command()
 @click.option("--detail", is_flag=True, default=False)
-@click.option("--db", default="memories.db", show_default=True, envvar="MNEME_DB_PATH")
-def stats(detail: bool, db: str) -> None:
+@click.option("--user-id", "user_id", default=None)
+@click.option("--db", default=_DB_DEFAULT, show_default=True, envvar="MNEME_DB_PATH")
+def stats(detail: bool, user_id: str | None, db: str) -> None:
     """Show memory statistics."""
     _db, _vindex, _embed, store, _searcher = _init_components(db)
     if detail:
-        stats_data = _db.get_detailed_stats()
+        stats_data = _db.get_detailed_stats(user_id=user_id)
         stats_data["vector_count"] = _vindex.count()
         console.print("[bold]Memory Statistics[/bold]")
         console.print(f"  Total:          [bold]{stats_data['total']}[/bold]")
@@ -296,9 +313,15 @@ def stats(detail: bool, db: str) -> None:
             for tag, c in stats_data["by_tag"].items():
                 console.print(f"    {tag}: {c}")
     else:
-        total = store.count()
+        total = store.count(user_id=user_id)
+        user_clause = (
+            " AND COALESCE(json_extract(metadata, '$.user_id'), 'default') = ?" if user_id else ""
+        )
+        user_params = [user_id] if user_id else []
         rows = _db.cursor.execute(
-            "SELECT type, COUNT(*) AS cnt FROM memories WHERE deleted_at IS NULL GROUP BY type"
+            f"SELECT type, COUNT(*) AS cnt FROM memories"
+            f" WHERE deleted_at IS NULL{user_clause} GROUP BY type",
+            user_params,
         ).fetchall()
         by_type: dict[str, int] = {r["type"]: r["cnt"] for r in rows}
         console.print(f"Total memories: [bold]{total}[/bold]")
@@ -308,7 +331,7 @@ def stats(detail: bool, db: str) -> None:
 
 @cli.command()
 @click.option("--dry-run", is_flag=True, default=False)
-@click.option("--db", default="memories.db", show_default=True, envvar="MNEME_DB_PATH")
+@click.option("--db", default=_DB_DEFAULT, show_default=True, envvar="MNEME_DB_PATH")
 def sleep(dry_run: bool, db: str) -> None:
     """Run memory consolidation and decay cycle."""
     from mneme.engine.sleep import SleepEngine
@@ -325,3 +348,113 @@ def sleep(dry_run: bool, db: str) -> None:
     console.print(f"  Total before:   {report.total_before}")
     console.print(f"  Total after:    {report.total_after}")
     console.print(f"  Duration:       {report.duration_ms}ms")
+
+
+# ── Plugin commands ──────────────────────────────────────────────
+
+
+@cli.group()
+def plugin() -> None:
+    """Plugin management commands."""
+
+
+@plugin.command("list")
+@click.option("--db", default=_DB_DEFAULT, show_default=True, envvar="MNEME_DB_PATH")
+def plugin_list(db: str) -> None:
+    """List loaded plugins."""
+    _db, _vindex, _embed, _store, _searcher = _init_components(db)
+    from mneme.plugin.bus import EventBus
+    from mneme.plugin.registry import PluginRegistry
+
+    bus = EventBus.get_instance()
+    registry = PluginRegistry(bus=bus)
+
+    # Discover and auto-load builtin plugins for listing
+    builtin = registry.discover()
+    for cls in builtin:
+        with contextlib.suppress(Exception):
+            registry.load(cls)
+
+    plugins = registry.list()
+    if not plugins:
+        console.print("[yellow]No plugins loaded.[/yellow]")
+        return
+    table = Table(title="Loaded Plugins")
+    table.add_column("Name", style="bold")
+    table.add_column("Class")
+    table.add_column("Loaded")
+    for info in plugins.values():
+        table.add_row(info["name"], info["class"], "yes" if info["loaded"] else "no")
+    console.print(table)
+
+
+@plugin.command("load")
+@click.argument("path", type=click.Path(exists=True))
+@click.option("--db", default=_DB_DEFAULT, show_default=True, envvar="MNEME_DB_PATH")
+def plugin_load(path: str, db: str) -> None:
+    """Load a plugin from a directory or file path."""
+    _db, _vindex, _embed, _store, _searcher = _init_components(db)
+    from mneme.plugin.bus import EventBus
+    from mneme.plugin.registry import PluginRegistry
+
+    bus = EventBus.get_instance()
+    registry = PluginRegistry(bus=bus)
+    discovered = registry.discover(plugin_dir=path)
+    if not discovered:
+        console.print("[yellow]No plugin classes found in the specified path.[/yellow]")
+        return
+    for cls in discovered:
+        registry.load(cls)
+        console.print(f"[green]Loaded plugin: {cls.name}[/green]")
+
+
+@plugin.command("unload")
+@click.argument("name")
+@click.option("--db", default=_DB_DEFAULT, show_default=True, envvar="MNEME_DB_PATH")
+def plugin_unload(name: str, db: str) -> None:
+    """Unload a plugin by name."""
+    _db, _vindex, _embed, _store, _searcher = _init_components(db)
+    from mneme.plugin.bus import EventBus
+    from mneme.plugin.registry import PluginRegistry
+
+    bus = EventBus.get_instance()
+    registry = PluginRegistry(bus=bus)
+
+    # Auto-load builtin to ensure registry has them
+    builtin = registry.discover()
+    for cls in builtin:
+        with contextlib.suppress(Exception):
+            registry.load(cls)
+
+    try:
+        registry.unload(name)
+        console.print(f"[green]Unloaded plugin: {name}[/green]")
+    except KeyError:
+        console.print(f"[red]Plugin '{name}' not found.[/red]")
+        sys.exit(1)
+
+
+# ── Users command ─────────────────────────────────────────────────
+
+
+@cli.group()
+def users() -> None:
+    """User management commands."""
+
+
+@users.command("list")
+@click.option("--db", default=_DB_DEFAULT, show_default=True, envvar="MNEME_DB_PATH")
+def users_list(db: str) -> None:
+    """List users who have memories."""
+    _db, _vindex, _embed, _store, _searcher = _init_components(db)
+    distinct_users = _db.get_distinct_users()
+    if not distinct_users:
+        console.print("[yellow]No users found.[/yellow]")
+        return
+    table = Table(title="Users")
+    table.add_column("User ID", style="bold")
+    table.add_column("Memory Count")
+    for uid in distinct_users:
+        count = _db.count(user_id=uid)
+        table.add_row(uid, str(count))
+    console.print(table)

@@ -19,6 +19,7 @@ class CreateMemoryRequest(BaseModel):
     tags: list[str] = Field(default_factory=list)
     weight: float = 1.0
     metadata: dict[str, Any] = Field(default_factory=dict)
+    user_id: str = "default"
 
 
 class UpdateMemoryRequest(BaseModel):
@@ -27,6 +28,7 @@ class UpdateMemoryRequest(BaseModel):
     tags: list[str] | None = None
     weight: float | None = None
     metadata: dict[str, Any] | None = None
+    user_id: str | None = None
 
 
 @router.post("/v1/memories", status_code=201)
@@ -42,6 +44,7 @@ async def create_memory(req: Request, body: CreateMemoryRequest) -> dict[str, An
         tags=body.tags,
         weight=body.weight,
         metadata=body.metadata,
+        user_id=body.user_id,
     )
     store.store(memory)
     return memory.to_dict()
@@ -62,13 +65,16 @@ async def list_memories(
     include_deleted: bool = False,
     offset: int = 0,
     limit: int = 20,
+    user_id: str | None = None,
 ) -> dict[str, Any]:
     store = req.app.state.store
     searcher = req.app.state.searcher
 
     if q:
         tag_list = tags.split(",") if tags else None
-        results = searcher.search(query=q, type_filter=type_filter, tags=tag_list, limit=limit)
+        results = searcher.search(
+            query=q, type_filter=type_filter, tags=tag_list, limit=limit, user_id=user_id
+        )
         return {"results": [dict(m.to_dict(), score=round(s, 4)) for m, s in results]}
 
     tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else None
@@ -85,6 +91,7 @@ async def list_memories(
             sort_by=sort_by,
             sort_order=sort_order,
             include_deleted=include_deleted,
+            user_id=user_id,
         )
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
@@ -101,6 +108,7 @@ class SearchRequest(BaseModel):
     limit: int = 20
     type_filter: str | None = Field(default=None, alias="type")
     tags: list[str] | None = None
+    user_id: str | None = None
 
     model_config = {"populate_by_name": True}
 
@@ -111,16 +119,22 @@ async def search_memories(req: Request, body: SearchRequest) -> dict[str, Any]:
     searcher = req.app.state.searcher
     tag_list = body.tags if body.tags else None
     results = searcher.search(
-        query=body.query, type_filter=body.type_filter, tags=tag_list, limit=body.limit
+        query=body.query,
+        type_filter=body.type_filter,
+        tags=tag_list,
+        limit=body.limit,
+        user_id=body.user_id,
     )
     return {"results": [dict(m.to_dict(), score=round(s, 4)) for m, s in results]}
 
 
 @router.get("/v1/memories/{memory_id}")
-async def get_memory(memory_id: str, req: Request) -> dict[str, Any]:
+async def get_memory(memory_id: str, req: Request, user_id: str | None = None) -> dict[str, Any]:
     store = req.app.state.store
     memory = store.get(memory_id)
     if not memory:
+        raise HTTPException(status_code=404, detail="Memory not found")
+    if user_id is not None and memory.user_id != user_id:
         raise HTTPException(status_code=404, detail="Memory not found")
     return memory.to_dict()
 
@@ -142,15 +156,10 @@ async def update_memory(memory_id: str, body: UpdateMemoryRequest, req: Request)
         existing.weight = body.weight
     if body.metadata is not None:
         existing.metadata = body.metadata
+    if body.user_id is not None:
+        existing.user_id = body.user_id
 
-    embedding = store.embed.encode(existing.content)
-    if not isinstance(embedding, list):
-        embedding = list(embedding)
-
-    store.vindex.delete(memory_id)
-    store.vindex.upsert(memory_id, embedding)
-    store.db.update(existing)
-
+    store.update(existing)
     return existing.to_dict()
 
 
@@ -165,8 +174,13 @@ async def delete_memory(memory_id: str, req: Request) -> dict[str, str]:
 
 
 @router.delete("/v1/memories")
-async def clear_memories(req: Request) -> dict[str, str]:
+async def clear_memories(req: Request, user_id: str | None = None) -> dict[str, str]:
     store = req.app.state.store
+    if user_id is not None:
+        memories, _ = store.db.list_memories(offset=0, limit=100000, user_id=user_id)
+        for m in memories:
+            store.delete(m.id)
+        return {"status": "cleared"}
     store.clear()
     return {"status": "cleared"}
 
@@ -199,17 +213,17 @@ async def get_contradictions(
 
 
 @router.get("/v1/stats/detailed")
-async def stats_detailed(req: Request) -> dict[str, Any]:
+async def stats_detailed(req: Request, user_id: str | None = None) -> dict[str, Any]:
     store = req.app.state.store
-    stats = store.db.get_detailed_stats()
+    stats = store.db.get_detailed_stats(user_id=user_id)
     stats["vector_count"] = store.vindex.count()
     return stats
 
 
 @router.get("/v1/stats")
-async def stats(req: Request) -> dict[str, Any]:
+async def stats(req: Request, user_id: str | None = None) -> dict[str, Any]:
     store = req.app.state.store
-    return store.stats()
+    return store.stats(user_id=user_id)
 
 
 @router.post("/v1/sleep")
@@ -227,3 +241,31 @@ async def trigger_sleep(req: Request, dry_run: bool = False) -> dict[str, Any]:
 @router.get("/v1/sleep/stats")
 async def sleep_stats(req: Request) -> dict[str, Any]:
     return req.app.state.sleep_stats
+
+
+@router.get("/v1/users/{user_id}/memories")
+async def get_user_memories(
+    user_id: str,
+    req: Request,
+    offset: int = 0,
+    limit: int = 20,
+    sort_by: str = "created_at",
+    sort_order: str = "desc",
+) -> dict[str, Any]:
+    store = req.app.state.store
+    try:
+        memories, total = store.db.list_memories(
+            offset=offset,
+            limit=limit,
+            sort_by=sort_by,
+            sort_order=sort_order,
+            user_id=user_id,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    return {
+        "results": [m.to_dict() for m in memories],
+        "total": total,
+        "offset": offset,
+        "limit": limit,
+    }
