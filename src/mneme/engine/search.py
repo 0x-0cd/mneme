@@ -21,6 +21,7 @@ class Searcher:
         tags: list[str] | None = None,
         limit: int = 20,
         semantic_weight: float = 0.5,
+        user_id: str | None = None,
     ) -> list[tuple[Memory, float]]:
         """Search and return (Memory, similarity_score) pairs.
 
@@ -29,6 +30,8 @@ class Searcher:
         """
         if not query:
             memories = self.db.search(query=None, type_filter=type_filter, tags=tags, limit=limit)
+            if user_id is not None:
+                memories = [m for m in memories if m.user_id == user_id]
             return [(m, 0.0) for m in memories]
 
         kw_results = self.db.search(query=query, type_filter=type_filter, tags=tags, limit=limit)
@@ -47,14 +50,14 @@ class Searcher:
                     continue
                 if tags and not all(t in m.tags for t in tags):
                     continue
-                # Convert cosine distance to similarity score [0, 1]
-                score = 1.0 - (distance / 2.0)  # distance in [0,2], map to [1,0]
+                if user_id is not None and m.user_id != user_id:
+                    continue
+                score = 1.0 - (distance / 2.0)
                 sem_scored.append((m, max(0.0, score)))
 
         seen: set[str] = set()
         merged: list[tuple[Memory, float]] = []
 
-        # Build score lookup: max semantic score per memory
         score_map: dict[str, float] = {}
         for m, s in sem_scored:
             score_map[m.id] = max(score_map.get(m.id, 0.0), s)
@@ -66,6 +69,8 @@ class Searcher:
         )
 
         for m, s in candidates:
+            if user_id is not None and m.user_id != user_id:
+                continue
             if m.id not in seen:
                 seen.add(m.id)
                 merged.append((m, score_map.get(m.id, s)))

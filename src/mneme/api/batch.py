@@ -17,6 +17,7 @@ class BatchDeleteRequest(BaseModel):
     date_to: str | None = None
     weight_min: float | None = None
     weight_max: float | None = None
+    user_id: str | None = None
 
 
 class BatchUpdateRequest(BatchDeleteRequest):
@@ -33,6 +34,7 @@ async def batch_delete(req: Request, body: BatchDeleteRequest) -> dict[str, Any]
         date_to=body.date_to,
         weight_min=body.weight_min,
         weight_max=body.weight_max,
+        user_id=body.user_id,
     )
     for mid in deleted_ids:
         store.vindex.delete(mid)
@@ -50,6 +52,7 @@ async def batch_update(req: Request, body: BatchUpdateRequest) -> dict[str, Any]
         date_to=body.date_to,
         weight_min=body.weight_min,
         weight_max=body.weight_max,
+        user_id=body.user_id,
     )
     return {"updated": updated}
 

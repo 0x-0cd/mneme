@@ -12,6 +12,8 @@ from mneme.embed.model import EmbeddingModel
 from mneme.engine.search import Searcher
 from mneme.engine.sleep import SleepEngine
 from mneme.engine.store import Store
+from mneme.plugin.bus import EventBus
+from mneme.plugin.registry import PluginRegistry
 from mneme.storage.db import Database
 from mneme.storage.vector import VectorIndex
 
@@ -32,8 +34,10 @@ def create_app(
         _vindex.initialize()
 
     _embed = embed or EmbeddingModel()
-    store = Store(_db, _vindex, _embed)
+    event_bus = EventBus()
+    store = Store(_db, _vindex, _embed, event_bus=event_bus)
     searcher = Searcher(_db, _vindex, _embed)
+    plugin_registry = PluginRegistry(bus=event_bus)
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> Any:
@@ -46,6 +50,13 @@ def create_app(
     app.state.searcher = searcher
     app.state.sleep_engine = SleepEngine(_db, _vindex, _embed, searcher)
     app.state.sleep_stats = {"last_sleep": None, "last_report": None}
+    app.state.event_bus = event_bus
+    app.state.plugin_registry = plugin_registry
+
+    # Auto-load builtin plugins
+    builtin_plugins = plugin_registry.discover()
+    for plugin_cls in builtin_plugins:
+        plugin_registry.load(plugin_cls)
 
     from mneme.api.batch import router as batch_router
     from mneme.api.routes import router

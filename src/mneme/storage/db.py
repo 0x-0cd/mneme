@@ -54,7 +54,9 @@ class Database:
     def _memory_to_row(memory: Memory) -> dict[str, Any]:
         d = memory.to_dict()
         d["tags"] = ",".join(d["tags"])
-        d["metadata"] = json.dumps(d["metadata"], ensure_ascii=False)
+        meta = dict(d.get("metadata", {}))
+        meta["user_id"] = d.get("user_id", "default")
+        d["metadata"] = json.dumps(meta, ensure_ascii=False)
         return d
 
     @staticmethod
@@ -64,6 +66,11 @@ class Database:
             d["tags"] = d["tags"].split(",") if d["tags"] else []
         if d.get("metadata") is not None:
             d["metadata"] = json.loads(d["metadata"])
+        meta = d.get("metadata")
+        if isinstance(meta, dict):
+            d["user_id"] = meta.pop("user_id", "default")
+        else:
+            d["user_id"] = "default"
         return Memory.from_dict(d)
 
     def insert(self, memory: Memory) -> None:
@@ -149,17 +156,40 @@ class Database:
         self.cursor.execute("DELETE FROM memories")
         self.conn.commit()
 
-    def count(self) -> int:
-        row = self.cursor.execute(
-            "SELECT COUNT(*) AS cnt FROM memories WHERE deleted_at IS NULL"
-        ).fetchone()
+    def count(self, user_id: str | None = None) -> int:
+        if user_id is not None:
+            row = self.cursor.execute(
+                "SELECT COUNT(*) AS cnt FROM memories"
+                " WHERE deleted_at IS NULL"
+                " AND COALESCE(json_extract(metadata, '$.user_id'), 'default') = ?",
+                (user_id,),
+            ).fetchone()
+        else:
+            row = self.cursor.execute(
+                "SELECT COUNT(*) AS cnt FROM memories WHERE deleted_at IS NULL"
+            ).fetchone()
         return row["cnt"] if row else 0
 
-    def get_all(self) -> list[Memory]:
-        rows = self.cursor.execute(
-            "SELECT * FROM memories WHERE deleted_at IS NULL ORDER BY created_at DESC"
-        ).fetchall()
+    def get_all(self, user_id: str | None = None) -> list[Memory]:
+        if user_id is not None:
+            rows = self.cursor.execute(
+                "SELECT * FROM memories WHERE deleted_at IS NULL"
+                " AND COALESCE(json_extract(metadata, '$.user_id'), 'default') = ?"
+                " ORDER BY created_at DESC",
+                (user_id,),
+            ).fetchall()
+        else:
+            rows = self.cursor.execute(
+                "SELECT * FROM memories WHERE deleted_at IS NULL ORDER BY created_at DESC"
+            ).fetchall()
         return [self._row_to_memory(r) for r in rows]
+
+    def get_distinct_users(self) -> list[str]:
+        rows = self.cursor.execute(
+            "SELECT DISTINCT COALESCE(json_extract(metadata, '$.user_id'), 'default') AS user_id"
+            " FROM memories WHERE deleted_at IS NULL"
+        ).fetchall()
+        return sorted(r["user_id"] for r in rows if r["user_id"])
 
     def _build_filter_where(
         self,
@@ -170,12 +200,17 @@ class Database:
         weight_min: float | None = None,
         weight_max: float | None = None,
         include_deleted: bool = False,
+        user_id: str | None = None,
     ) -> tuple[str, list[Any]]:
         conditions: list[str] = []
         params: list[Any] = []
 
         if not include_deleted:
             conditions.append("deleted_at IS NULL")
+
+        if user_id is not None:
+            conditions.append("COALESCE(json_extract(metadata, '$.user_id'), 'default') = ?")
+            params.append(user_id)
 
         if type_filter is not None:
             conditions.append("type = ?")
@@ -218,6 +253,7 @@ class Database:
         sort_by: str = "created_at",
         sort_order: str = "desc",
         include_deleted: bool = False,
+        user_id: str | None = None,
     ) -> tuple[list[Memory], int]:
         """Return (memories, total_count) with pagination and multi-filter support."""
         valid_sort_columns = {"created_at", "updated_at", "weight"}
@@ -234,6 +270,7 @@ class Database:
             weight_min=weight_min,
             weight_max=weight_max,
             include_deleted=include_deleted,
+            user_id=user_id,
         )
 
         count_sql = f"SELECT COUNT(*) AS cnt FROM memories WHERE {where_sql}"
@@ -257,6 +294,7 @@ class Database:
         date_to: str | None = None,
         weight_min: float | None = None,
         weight_max: float | None = None,
+        user_id: str | None = None,
     ) -> tuple[int, list[str]]:
         """Soft-delete memories matching filters. Returns (deleted_count, deleted_ids)."""
         where_sql, params = self._build_filter_where(
@@ -267,6 +305,7 @@ class Database:
             weight_min=weight_min,
             weight_max=weight_max,
             include_deleted=False,
+            user_id=user_id,
         )
 
         rows = self.cursor.execute(f"SELECT id FROM memories WHERE {where_sql}", params).fetchall()
@@ -293,6 +332,7 @@ class Database:
         date_to: str | None = None,
         weight_min: float | None = None,
         weight_max: float | None = None,
+        user_id: str | None = None,
     ) -> int:
         """Update memories matching filters. Returns updated count."""
         where_sql, params = self._build_filter_where(
@@ -303,6 +343,7 @@ class Database:
             weight_min=weight_min,
             weight_max=weight_max,
             include_deleted=False,
+            user_id=user_id,
         )
 
         # Determine which matching IDs to update
@@ -394,18 +435,26 @@ class Database:
         self.conn.commit()
         return count, imported
 
-    def get_detailed_stats(self) -> dict[str, Any]:
+    def get_detailed_stats(self, user_id: str | None = None) -> dict[str, Any]:
         """Return detailed stats: total, by_type, by_tag, total_weight, deleted_count."""
-        total_active = self.count()
+        user_clause = (
+            " AND COALESCE(json_extract(metadata, '$.user_id'), 'default') = ?" if user_id else ""
+        )
+        user_params = [user_id] if user_id else []
+
+        total_active = self.count(user_id=user_id)
 
         by_type_rows = self.cursor.execute(
-            "SELECT type, COUNT(*) AS cnt FROM memories WHERE deleted_at IS NULL GROUP BY type"
+            f"SELECT type, COUNT(*) AS cnt FROM memories"
+            f" WHERE deleted_at IS NULL{user_clause} GROUP BY type",
+            user_params,
         ).fetchall()
         by_type: dict[str, int] = {r["type"]: r["cnt"] for r in by_type_rows}
 
         weight_row = self.cursor.execute(
-            "SELECT COALESCE(SUM(weight), 0.0) AS total_weight"
-            " FROM memories WHERE deleted_at IS NULL"
+            f"SELECT COALESCE(SUM(weight), 0.0) AS total_weight"
+            f" FROM memories WHERE deleted_at IS NULL{user_clause}",
+            user_params,
         ).fetchone()
         total_weight = weight_row["total_weight"] if weight_row else 0.0
 
@@ -414,9 +463,9 @@ class Database:
         ).fetchone()
         deleted_count = deleted_row["cnt"] if deleted_row else 0
 
-        # Aggregate tags across all non-deleted memories
         all_rows = self.cursor.execute(
-            "SELECT tags FROM memories WHERE deleted_at IS NULL"
+            f"SELECT tags FROM memories WHERE deleted_at IS NULL{user_clause}",
+            user_params,
         ).fetchall()
         tag_counts: dict[str, int] = {}
         for row in all_rows:
@@ -435,11 +484,17 @@ class Database:
             "deleted_count": deleted_count,
         }
 
-    def get_stats(self) -> dict:
+    def get_stats(self, user_id: str | None = None) -> dict:
         """Return total count and per-type breakdown."""
-        total = self.count()
+        total = self.count(user_id=user_id)
+        user_clause = (
+            " AND COALESCE(json_extract(metadata, '$.user_id'), 'default') = ?" if user_id else ""
+        )
+        user_params = [user_id] if user_id else []
         rows = self.cursor.execute(
-            "SELECT type, COUNT(*) AS cnt FROM memories WHERE deleted_at IS NULL GROUP BY type"
+            f"SELECT type, COUNT(*) AS cnt FROM memories"
+            f" WHERE deleted_at IS NULL{user_clause} GROUP BY type",
+            user_params,
         ).fetchall()
         by_type: dict[str, int] = {r["type"]: r["cnt"] for r in rows}
         return {"total": total, "by_type": by_type}
