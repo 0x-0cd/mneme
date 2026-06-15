@@ -12,6 +12,7 @@ from mneme.embed.model import EmbeddingModel
 from mneme.engine.search import Searcher
 from mneme.engine.sleep import SleepEngine
 from mneme.engine.store import Store
+from mneme.engine.weight import WeightCalibrator
 from mneme.plugin.bus import EventBus
 from mneme.plugin.registry import PluginRegistry
 from mneme.storage.db import Database
@@ -35,7 +36,8 @@ def create_app(
 
     _embed = embed or EmbeddingModel()
     event_bus = EventBus()
-    store = Store(_db, _vindex, _embed, event_bus=event_bus)
+    calibrator = WeightCalibrator(resolved_path)
+    store = Store(_db, _vindex, _embed, event_bus=event_bus, calibrator=calibrator)
     searcher = Searcher(_db, _vindex, _embed)
     plugin_registry = PluginRegistry(bus=event_bus)
 
@@ -44,6 +46,7 @@ def create_app(
         yield
         _db.close()
         _vindex.close()
+        calibrator.close()
 
     app = FastAPI(title="Mneme", lifespan=lifespan)
     app.state.store = store
@@ -52,6 +55,7 @@ def create_app(
     app.state.sleep_stats = {"last_sleep": None, "last_report": None}
     app.state.event_bus = event_bus
     app.state.plugin_registry = plugin_registry
+    app.state.calibrator = calibrator
 
     # Auto-load builtin plugins
     builtin_plugins = plugin_registry.discover()
