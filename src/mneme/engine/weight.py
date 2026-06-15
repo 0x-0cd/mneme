@@ -196,8 +196,25 @@ class WeightCalibrator:
         }
 
     def decay_calibrations(self) -> None:
-        """Phase 3 stub — decay calibration bias toward zero over time."""
-        pass
+        """Decay calibration bias toward zero by 10% per sleep cycle.
+
+        - bias *= 0.9 each cycle
+        - reset pos_consecutive = 0 (fresh start after sleep)
+        - remove entries where abs(bias) < 0.001 (cleanup near-zero)
+        """
+        self.cursor.execute("""
+            UPDATE weight_calibrations
+            SET bias = CASE
+                WHEN ABS(bias) < 0.001 THEN 0.0
+                ELSE bias * 0.9
+            END,
+            pos_consecutive = 0,
+            updated_at = datetime('now')
+        """)
+        self.cursor.execute(
+            "DELETE FROM weight_calibrations WHERE ABS(bias) < 0.001"
+        )
+        self.conn.commit()
 
     def close(self) -> None:
         self.conn.close()

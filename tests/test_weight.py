@@ -192,3 +192,40 @@ class TestTableInitialization:
         assert row is not None
         assert row["pos_consecutive"] == 0
         assert row["last_signal"] == "positive"
+
+
+class TestDecayCalibrations:
+    def test_decay_reduces_bias_by_10_percent(self, cal: WeightCalibrator) -> None:
+        cal.apply_feedback("user_a", "preference", "negative")
+        assert cal._load_calibration("user_a", "preference")["bias"] == pytest.approx(-0.05)
+        cal.decay_calibrations()
+        assert cal._load_calibration("user_a", "preference")["bias"] == pytest.approx(-0.045)
+
+    def test_decay_resets_pos_consecutive(self, cal: WeightCalibrator) -> None:
+        cal.apply_feedback("user_a", "preference", "negative")
+        cal.apply_feedback("user_a", "preference", "positive")
+        cal.apply_feedback("user_a", "preference", "positive")
+        row = cal._load_calibration("user_a", "preference")
+        assert row["pos_consecutive"] > 0
+        cal.decay_calibrations()
+        row2 = cal._load_calibration("user_a", "preference")
+        assert row2["pos_consecutive"] == 0
+
+    def test_decay_removes_near_zero_biases(self, cal: WeightCalibrator) -> None:
+        cal.apply_feedback("user_a", "preference", "positive")
+        row = cal._load_calibration("user_a", "preference")
+        assert row is not None
+        for _ in range(100):
+            cal.decay_calibrations()
+        assert cal._load_calibration("user_a", "preference") is None
+
+    def test_decay_is_idempotent(self, cal: WeightCalibrator) -> None:
+        cal.decay_calibrations()
+
+    def test_multiple_decays_compound(self, cal: WeightCalibrator) -> None:
+        cal.apply_feedback("user_a", "preference", "negative")
+        cal.decay_calibrations()
+        b1 = cal._load_calibration("user_a", "preference")["bias"]
+        cal.decay_calibrations()
+        b2 = cal._load_calibration("user_a", "preference")["bias"]
+        assert b2 == pytest.approx(b1 * 0.9)
