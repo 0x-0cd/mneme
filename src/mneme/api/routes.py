@@ -115,6 +115,12 @@ class SearchRequest(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+class FeedbackRequest(BaseModel):
+    memory_id: str | None = None
+    signal: str
+    user_id: str = "default"
+
+
 @router.post("/v1/memories/search")
 async def search_memories(req: Request, body: SearchRequest) -> dict[str, Any]:
     """Search memories via POST (for LoCoMo benchmark compatibility)."""
@@ -243,6 +249,31 @@ async def trigger_sleep(req: Request, dry_run: bool = False) -> dict[str, Any]:
 @router.get("/v1/sleep/stats")
 async def sleep_stats(req: Request) -> dict[str, Any]:
     return req.app.state.sleep_stats
+
+
+@router.post("/v1/feedback")
+async def submit_feedback(req: Request, body: FeedbackRequest) -> dict[str, Any]:
+    calibrator = req.app.state.calibrator
+    if not calibrator:
+        raise HTTPException(status_code=503, detail="Calibrator not available")
+
+    user_id = body.user_id
+    mem_type: str | None = None
+
+    if body.memory_id:
+        store = req.app.state.store
+        memory = store.get(body.memory_id)
+        if memory:
+            user_id = memory.user_id
+            mem_type = str(memory.type)
+
+    if not mem_type:
+        raise HTTPException(status_code=422, detail="Could not determine memory type")
+
+    result = calibrator.apply_feedback(
+        user_id, mem_type, body.signal, memory_id=body.memory_id,
+    )
+    return {"status": "ok", **result}
 
 
 @router.get("/v1/users/{user_id}/memories")
