@@ -5,11 +5,15 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 from mneme.embed.model import EmbeddingModel
 from mneme.engine.search import Searcher
 from mneme.storage.db import Database
 from mneme.storage.vector import VectorIndex
+
+if TYPE_CHECKING:
+    from mneme.engine.weight import WeightCalibrator
 
 
 @dataclass
@@ -39,11 +43,13 @@ class SleepEngine:
         vindex: VectorIndex,
         embed: EmbeddingModel,
         searcher: Searcher,
+        calibrator: WeightCalibrator | None = None,
     ) -> None:
         self.db = db
         self.vindex = vindex
         self.embed = embed
         self.searcher = searcher
+        self.calibrator = calibrator
 
     def consolidate(self, threshold: float = 0.92, dry_run: bool = False) -> int:
         memories = self.db.get_all()
@@ -144,6 +150,10 @@ class SleepEngine:
         t0 = time.time()
         consolidated = self.consolidate(dry_run=dry_run)
         decayed, forgotten = self.decay(dry_run=dry_run)
+
+        if self.calibrator and not dry_run:
+            self.calibrator.decay_calibrations()
+
         total_after = self.db.count() if not dry_run else max(0, total_before - consolidated)
         duration_ms = int((time.time() - t0) * 1000)
 

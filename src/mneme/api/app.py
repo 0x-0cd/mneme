@@ -51,7 +51,7 @@ def create_app(
     app = FastAPI(title="Mneme", lifespan=lifespan)
     app.state.store = store
     app.state.searcher = searcher
-    app.state.sleep_engine = SleepEngine(_db, _vindex, _embed, searcher)
+    app.state.sleep_engine = SleepEngine(_db, _vindex, _embed, searcher, calibrator=calibrator)
     app.state.sleep_stats = {"last_sleep": None, "last_report": None}
     app.state.event_bus = event_bus
     app.state.plugin_registry = plugin_registry
