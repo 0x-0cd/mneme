@@ -346,3 +346,49 @@ class TestAPISleep:
         resp_after = await client.get("/v1/sleep/stats")
         assert resp_after.json()["last_sleep"] is not None
         assert resp_after.json()["last_report"] is not None
+
+
+class TestTimeSimulation:
+    """模拟时间流逝的衰减测试。"""
+
+    @pytest.fixture
+    def app(self):
+        db = Database(":memory:")
+        db.initialize()
+        vindex = FakeVectorIndex()
+        embed = FakeEmbeddingModel()
+        return create_app(db=db, vindex=vindex, embed=embed)
+
+    @pytest.fixture
+    async def client(self, app):
+        transport = ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
+            yield ac
+
+    async def test_decay_with_simulated_time(self, client):
+        """创建记忆后用未来的 now 跑 decay，验证权重按半衰期衰减。"""
+        resp = await client.post("/v1/memories", json={"content": "test", "weight": 1.0})
+        assert resp.status_code == 201
+        mem_id = resp.json()["id"]
+
+        future = datetime.now(UTC) + timedelta(days=30)
+
+        engine = client._transport.app.state.sleep_engine
+        engine.run_cycle(now=future)
+
+        mem = client._transport.app.state.store.get(mem_id)
+        assert mem is not None
+        assert mem.weight == pytest.approx(0.5, rel=0.1)
+
+    async def test_multiple_simulated_cycles(self, client):
+        """模拟多周期衰减。"""
+        resp = await client.post("/v1/memories", json={"content": "cycle_test", "weight": 1.0})
+        assert resp.status_code == 201
+        engine = client._transport.app.state.sleep_engine
+
+        future = datetime.now(UTC) + timedelta(days=60)
+        engine.run_cycle(now=future)
+
+        mem = client._transport.app.state.store.get(resp.json()["id"])
+        assert mem is not None
+        assert mem.weight == pytest.approx(0.25, rel=0.1)
