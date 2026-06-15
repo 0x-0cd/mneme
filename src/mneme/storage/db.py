@@ -161,6 +161,280 @@ class Database:
         ).fetchall()
         return [self._row_to_memory(r) for r in rows]
 
+    def _build_filter_where(
+        self,
+        type_filter: str | None = None,
+        tags: list[str] | None = None,
+        date_from: str | None = None,
+        date_to: str | None = None,
+        weight_min: float | None = None,
+        weight_max: float | None = None,
+        include_deleted: bool = False,
+    ) -> tuple[str, list[Any]]:
+        conditions: list[str] = []
+        params: list[Any] = []
+
+        if not include_deleted:
+            conditions.append("deleted_at IS NULL")
+
+        if type_filter is not None:
+            conditions.append("type = ?")
+            params.append(type_filter)
+
+        if tags:
+            for tag in tags:
+                conditions.append("(',' || tags || ',') LIKE ?")
+                params.append(f"%,{tag},%")
+
+        if date_from is not None:
+            conditions.append("created_at >= ?")
+            params.append(date_from)
+
+        if date_to is not None:
+            conditions.append("created_at <= ?")
+            params.append(date_to)
+
+        if weight_min is not None:
+            conditions.append("weight >= ?")
+            params.append(weight_min)
+
+        if weight_max is not None:
+            conditions.append("weight <= ?")
+            params.append(weight_max)
+
+        where = " AND ".join(conditions) if conditions else "1=1"
+        return where, params
+
+    def list_memories(
+        self,
+        offset: int = 0,
+        limit: int = 20,
+        type_filter: str | None = None,
+        tags: list[str] | None = None,
+        date_from: str | None = None,
+        date_to: str | None = None,
+        weight_min: float | None = None,
+        weight_max: float | None = None,
+        sort_by: str = "created_at",
+        sort_order: str = "desc",
+        include_deleted: bool = False,
+    ) -> tuple[list[Memory], int]:
+        """Return (memories, total_count) with pagination and multi-filter support."""
+        valid_sort_columns = {"created_at", "updated_at", "weight"}
+        if sort_by not in valid_sort_columns:
+            raise ValueError(f"Invalid sort_by: {sort_by}. Must be one of {valid_sort_columns}")
+        if sort_order not in ("asc", "desc"):
+            raise ValueError("sort_order must be 'asc' or 'desc'")
+
+        where_sql, params = self._build_filter_where(
+            type_filter=type_filter,
+            tags=tags,
+            date_from=date_from,
+            date_to=date_to,
+            weight_min=weight_min,
+            weight_max=weight_max,
+            include_deleted=include_deleted,
+        )
+
+        count_sql = f"SELECT COUNT(*) AS cnt FROM memories WHERE {where_sql}"
+        count_row = self.cursor.execute(count_sql, params).fetchone()
+        total = count_row["cnt"] if count_row else 0
+
+        data_sql = (
+            f"SELECT * FROM memories WHERE {where_sql}"
+            f" ORDER BY {sort_by} {sort_order}"
+            f" LIMIT ? OFFSET ?"
+        )
+        rows = self.cursor.execute(data_sql, params + [limit, offset]).fetchall()
+        memories = [self._row_to_memory(r) for r in rows]
+        return memories, total
+
+    def batch_delete(
+        self,
+        type_filter: str | None = None,
+        tags: list[str] | None = None,
+        date_from: str | None = None,
+        date_to: str | None = None,
+        weight_min: float | None = None,
+        weight_max: float | None = None,
+    ) -> tuple[int, list[str]]:
+        """Soft-delete memories matching filters. Returns (deleted_count, deleted_ids)."""
+        where_sql, params = self._build_filter_where(
+            type_filter=type_filter,
+            tags=tags,
+            date_from=date_from,
+            date_to=date_to,
+            weight_min=weight_min,
+            weight_max=weight_max,
+            include_deleted=False,
+        )
+
+        rows = self.cursor.execute(f"SELECT id FROM memories WHERE {where_sql}", params).fetchall()
+        ids = [r["id"] for r in rows]
+
+        if not ids:
+            return 0, []
+
+        now = datetime.now(UTC).isoformat()
+        placeholders = ",".join(["?"] * len(ids))
+        self.cursor.execute(
+            f"UPDATE memories SET deleted_at = ? WHERE id IN ({placeholders})",
+            [now] + ids,
+        )
+        self.conn.commit()
+        return len(ids), ids
+
+    def batch_update(
+        self,
+        updates: dict[str, Any],
+        type_filter: str | None = None,
+        tags: list[str] | None = None,
+        date_from: str | None = None,
+        date_to: str | None = None,
+        weight_min: float | None = None,
+        weight_max: float | None = None,
+    ) -> int:
+        """Update memories matching filters. Returns updated count."""
+        where_sql, params = self._build_filter_where(
+            type_filter=type_filter,
+            tags=tags,
+            date_from=date_from,
+            date_to=date_to,
+            weight_min=weight_min,
+            weight_max=weight_max,
+            include_deleted=False,
+        )
+
+        # Determine which matching IDs to update
+        rows = self.cursor.execute(f"SELECT id FROM memories WHERE {where_sql}", params).fetchall()
+        ids = [r["id"] for r in rows]
+
+        if not ids:
+            return 0
+
+        set_parts: list[str] = []
+        set_params: list[Any] = []
+        now = datetime.now(UTC).isoformat()
+
+        if "tags" in updates:
+            set_parts.append("tags = ?")
+            set_params.append(",".join(updates["tags"]))
+
+        if "weight" in updates:
+            set_parts.append("weight = ?")
+            set_params.append(updates["weight"])
+
+        if "type" in updates:
+            set_parts.append("type = ?")
+            set_params.append(updates["type"])
+
+        if not set_parts:
+            return 0
+
+        set_parts.append("updated_at = ?")
+        set_params.append(now)
+
+        placeholders = ",".join(["?"] * len(ids))
+        self.cursor.execute(
+            f"UPDATE memories SET {', '.join(set_parts)} WHERE id IN ({placeholders})",
+            set_params + ids,
+        )
+        self.conn.commit()
+        return len(ids)
+
+    def restore(self, memory_id: str) -> bool:
+        """Restore a soft-deleted memory. Returns True if restored."""
+        self.cursor.execute(
+            "UPDATE memories SET deleted_at = NULL WHERE id = ? AND deleted_at IS NOT NULL",
+            (memory_id,),
+        )
+        self.conn.commit()
+        return self.cursor.rowcount > 0
+
+    def get_deleted(self, limit: int = 50) -> list[Memory]:
+        """Get soft-deleted memories."""
+        rows = self.cursor.execute(
+            "SELECT * FROM memories WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+        return [self._row_to_memory(r) for r in rows]
+
+    def export_all(self) -> list[dict[str, Any]]:
+        """Export all memories (including soft-deleted) as JSON-compatible dicts."""
+        rows = self.cursor.execute("SELECT * FROM memories").fetchall()
+        return [self._row_to_memory(r).to_dict() for r in rows]
+
+    def import_memories(
+        self, memories_data: list[dict[str, Any]]
+    ) -> tuple[int, list[dict[str, Any]]]:
+        """Import memories from JSON-compatible dicts. Returns (count, imported_data)."""
+        count = 0
+        imported: list[dict[str, Any]] = []
+        for data in memories_data:
+            row = dict(data)
+            if isinstance(row.get("tags"), list):
+                row["tags"] = ",".join(row["tags"])
+            if isinstance(row.get("metadata"), dict):
+                row["metadata"] = json.dumps(row["metadata"], ensure_ascii=False)
+
+            try:
+                self.cursor.execute(
+                    """INSERT OR IGNORE INTO memories
+                       (id, type, content, weight, metadata, tags,
+                        created_at, updated_at, version, superseded_by, deleted_at)
+                       VALUES (:id, :type, :content, :weight, :metadata, :tags,
+                               :created_at, :updated_at, :version, :superseded_by, :deleted_at)""",
+                    row,
+                )
+                if self.cursor.rowcount > 0:
+                    count += 1
+                    imported.append(data)
+            except Exception:
+                continue
+        self.conn.commit()
+        return count, imported
+
+    def get_detailed_stats(self) -> dict[str, Any]:
+        """Return detailed stats: total, by_type, by_tag, total_weight, deleted_count."""
+        total_active = self.count()
+
+        by_type_rows = self.cursor.execute(
+            "SELECT type, COUNT(*) AS cnt FROM memories WHERE deleted_at IS NULL GROUP BY type"
+        ).fetchall()
+        by_type: dict[str, int] = {r["type"]: r["cnt"] for r in by_type_rows}
+
+        weight_row = self.cursor.execute(
+            "SELECT COALESCE(SUM(weight), 0.0) AS total_weight"
+            " FROM memories WHERE deleted_at IS NULL"
+        ).fetchone()
+        total_weight = weight_row["total_weight"] if weight_row else 0.0
+
+        deleted_row = self.cursor.execute(
+            "SELECT COUNT(*) AS cnt FROM memories WHERE deleted_at IS NOT NULL"
+        ).fetchone()
+        deleted_count = deleted_row["cnt"] if deleted_row else 0
+
+        # Aggregate tags across all non-deleted memories
+        all_rows = self.cursor.execute(
+            "SELECT tags FROM memories WHERE deleted_at IS NULL"
+        ).fetchall()
+        tag_counts: dict[str, int] = {}
+        for row in all_rows:
+            if row["tags"]:
+                for tag in row["tags"].split(","):
+                    tag = tag.strip()
+                    if tag:
+                        tag_counts[tag] = tag_counts.get(tag, 0) + 1
+        by_tag = dict(sorted(tag_counts.items(), key=lambda x: x[1], reverse=True))
+
+        return {
+            "total": total_active,
+            "by_type": by_type,
+            "by_tag": by_tag,
+            "total_weight": total_weight,
+            "deleted_count": deleted_count,
+        }
+
     def get_stats(self) -> dict:
         """Return total count and per-type breakdown."""
         total = self.count()

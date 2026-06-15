@@ -251,8 +251,12 @@ class TestRunCycle:
 
     def test_sleep_report_to_dict(self) -> None:
         report = SleepReport(
-            consolidated=3, decayed=12, forgotten=2,
-            total_before=100, total_after=85, duration_ms=156,
+            consolidated=3,
+            decayed=12,
+            forgotten=2,
+            total_before=100,
+            total_after=85,
+            duration_ms=156,
         )
         d = report.to_dict()
         assert d["consolidated"] == 3
