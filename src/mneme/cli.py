@@ -170,18 +170,140 @@ def detect(memory_id: str | None, db: str) -> None:
 
 
 @cli.command()
+@click.option("--type", "type_", default=None, help="Filter by memory type")
+@click.option("--tags", default=None, help="Comma-separated tags")
+@click.option("--limit", default=20, type=int, show_default=True)
+@click.option("--offset", default=0, type=int, show_default=True)
+@click.option("--sort-by", default="created_at", show_default=True)
+@click.option("--sort-order", default="desc", show_default=True)
+@click.option("--include-deleted", is_flag=True, default=False)
 @click.option("--db", default="memories.db", show_default=True, envvar="MNEME_DB_PATH")
-def stats(db: str) -> None:
+def list(
+    type_: str | None,
+    tags: str | None,
+    limit: int,
+    offset: int,
+    sort_by: str,
+    sort_order: str,
+    include_deleted: bool,
+    db: str,
+) -> None:
+    """List memories with pagination and filtering."""
+    _db, _vindex, _embed, _store, _searcher = _init_components(db)
+    tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else None
+    memories, total = _db.list_memories(
+        offset=offset,
+        limit=limit,
+        type_filter=type_,
+        tags=tag_list,
+        sort_by=sort_by,
+        sort_order=sort_order,
+        include_deleted=include_deleted,
+    )
+    if not memories:
+        console.print("[yellow]No memories found.[/yellow]")
+        return
+    table = Table(title=f"Memories ({offset + 1}-{offset + len(memories)} of {total})")
+    table.add_column("ID", style="dim", no_wrap=True)
+    table.add_column("Type")
+    table.add_column("Content")
+    table.add_column("Weight")
+    table.add_column("Tags")
+    table.add_column("Created")
+    for m in memories:
+        table.add_row(
+            m.id[:8],
+            m.type.value,
+            m.content[:80] + ("..." if len(m.content) > 80 else ""),
+            f"{m.weight:.2f}",
+            ",".join(m.tags),
+            m.created_at.strftime("%Y-%m-%d %H:%M"),
+        )
+    console.print(table)
+
+
+@cli.command()
+@click.argument("output", type=click.Path())
+@click.option("--db", default="memories.db", show_default=True, envvar="MNEME_DB_PATH")
+def export(output: str, db: str) -> None:
+    """Export all memories to a JSON file."""
+    import json
+
+    _db, _vindex, _embed, _store, _searcher = _init_components(db)
+    data = _db.export_all()
+    with open(output, "w") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    console.print(f"[green]Exported {len(data)} memories to {output}[/green]")
+
+
+@cli.command("import")
+@click.argument("input_path", type=click.Path(exists=True))
+@click.option("--db", default="memories.db", show_default=True, envvar="MNEME_DB_PATH")
+def import_memories(input_path: str, db: str) -> None:
+    """Import memories from a JSON file."""
+    import json
+
+    _db, _vindex, _embed, store, _searcher = _init_components(db)
+    with open(input_path) as f:
+        data = json.load(f)
+    if not isinstance(data, list):
+        console.print("[red]Error: JSON file must contain an array of memories.[/red]")
+        sys.exit(1)
+    count, imported = _db.import_memories(data)
+    for mem in imported:
+        content = mem.get("content", "")
+        if content:
+            embedding = store.embed.encode(content)
+            if not isinstance(embedding, list):
+                embedding = list(embedding)
+            store.vindex.upsert(mem["id"], embedding)
+    console.print(f"[green]Imported {count} new memories[/green]")
+
+
+@cli.command()
+@click.argument("memory_id")
+@click.option("--db", default="memories.db", show_default=True, envvar="MNEME_DB_PATH")
+def restore(memory_id: str, db: str) -> None:
+    """Restore a soft-deleted memory."""
+    _db, _vindex, _embed, _store, _searcher = _init_components(db)
+    if _db.restore(memory_id):
+        console.print(f"Restored memory {memory_id}.")
+    else:
+        console.print(f"Memory {memory_id} not found or not deleted.", style="red")
+        sys.exit(1)
+
+
+@cli.command()
+@click.option("--detail", is_flag=True, default=False)
+@click.option("--db", default="memories.db", show_default=True, envvar="MNEME_DB_PATH")
+def stats(detail: bool, db: str) -> None:
     """Show memory statistics."""
     _db, _vindex, _embed, store, _searcher = _init_components(db)
-    total = store.count()
-    rows = _db.cursor.execute(
-        "SELECT type, COUNT(*) AS cnt FROM memories WHERE deleted_at IS NULL GROUP BY type"
-    ).fetchall()
-    by_type: dict[str, int] = {r["type"]: r["cnt"] for r in rows}
-    console.print(f"Total memories: [bold]{total}[/bold]")
-    for t, c in sorted(by_type.items()):
-        console.print(f"  {t}: {c}")
+    if detail:
+        stats_data = _db.get_detailed_stats()
+        stats_data["vector_count"] = _vindex.count()
+        console.print("[bold]Memory Statistics[/bold]")
+        console.print(f"  Total:          [bold]{stats_data['total']}[/bold]")
+        console.print(f"  Total weight:   {stats_data['total_weight']:.2f}")
+        console.print(f"  Deleted:        {stats_data['deleted_count']}")
+        console.print(f"  Vector entries: {stats_data['vector_count']}")
+        if stats_data["by_type"]:
+            console.print("  [bold]By type:[/bold]")
+            for t, c in sorted(stats_data["by_type"].items()):
+                console.print(f"    {t}: {c}")
+        if stats_data["by_tag"]:
+            console.print("  [bold]By tag:[/bold]")
+            for tag, c in stats_data["by_tag"].items():
+                console.print(f"    {tag}: {c}")
+    else:
+        total = store.count()
+        rows = _db.cursor.execute(
+            "SELECT type, COUNT(*) AS cnt FROM memories WHERE deleted_at IS NULL GROUP BY type"
+        ).fetchall()
+        by_type: dict[str, int] = {r["type"]: r["cnt"] for r in rows}
+        console.print(f"Total memories: [bold]{total}[/bold]")
+        for t, c in sorted(by_type.items()):
+            console.print(f"  {t}: {c}")
 
 
 @cli.command()

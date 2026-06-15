@@ -53,12 +53,47 @@ async def list_memories(
     q: str | None = None,
     type_filter: str | None = Query(default=None, alias="type"),
     tags: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    weight_min: float | None = None,
+    weight_max: float | None = None,
+    sort_by: str = "created_at",
+    sort_order: str = "desc",
+    include_deleted: bool = False,
+    offset: int = 0,
     limit: int = 20,
 ) -> dict[str, Any]:
+    store = req.app.state.store
     searcher = req.app.state.searcher
-    tag_list = tags.split(",") if tags else None
-    results = searcher.search(query=q, type_filter=type_filter, tags=tag_list, limit=limit)
-    return {"results": [dict(m.to_dict(), score=round(s, 4)) for m, s in results]}
+
+    if q:
+        tag_list = tags.split(",") if tags else None
+        results = searcher.search(query=q, type_filter=type_filter, tags=tag_list, limit=limit)
+        return {"results": [dict(m.to_dict(), score=round(s, 4)) for m, s in results]}
+
+    tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else None
+    try:
+        memories, total = store.db.list_memories(
+            offset=offset,
+            limit=limit,
+            type_filter=type_filter,
+            tags=tag_list,
+            date_from=date_from,
+            date_to=date_to,
+            weight_min=weight_min,
+            weight_max=weight_max,
+            sort_by=sort_by,
+            sort_order=sort_order,
+            include_deleted=include_deleted,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    return {
+        "results": [m.to_dict() for m in memories],
+        "total": total,
+        "offset": offset,
+        "limit": limit,
+    }
 
 
 class SearchRequest(BaseModel):
@@ -161,6 +196,14 @@ async def get_contradictions(
         "contradictions": [c.to_dict() for c in contradictions],
         "total": len(contradictions),
     }
+
+
+@router.get("/v1/stats/detailed")
+async def stats_detailed(req: Request) -> dict[str, Any]:
+    store = req.app.state.store
+    stats = store.db.get_detailed_stats()
+    stats["vector_count"] = store.vindex.count()
+    return stats
 
 
 @router.get("/v1/stats")

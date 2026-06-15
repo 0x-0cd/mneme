@@ -47,8 +47,10 @@ def create_app(
     app.state.sleep_engine = SleepEngine(_db, _vindex, _embed, searcher)
     app.state.sleep_stats = {"last_sleep": None, "last_report": None}
 
+    from mneme.api.batch import router as batch_router
     from mneme.api.routes import router
 
+    app.include_router(batch_router)
     app.include_router(router)
 
     return app
