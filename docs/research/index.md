@@ -9,3 +9,4 @@
 | 06-technical-references | 技术参考 | sqlite-vec 在 384 维、10 万向量以下性能最优；MCP 协议是 AI Agent 工具事实标准 |
 | 07-evoarena-evomem-analysis | EvoArena + EvoMem | 补丁式记忆范式在 LoCoMo 上 +4.8%；State Collapse 问题分析 |
 | 08-evolvemem-analysis | EvolveMem 自进化记忆 | LoCoMo 0.543 F1（+36.8% vs Mem0）；LLM驱动的自进化检索配置 |
+| 09-locomo-benchmark-reference | LoCoMo 基准测试参考 | 首次端到端评估 Conv 0 准确率 90%；temporal 100%, multi-hop 71.4%；修复 content→memory bug 后大幅提升 |
