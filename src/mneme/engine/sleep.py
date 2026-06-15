@@ -119,10 +119,11 @@ class SleepEngine:
         halflife_days: float = 30.0,
         forget_threshold: float = 0.05,
         dry_run: bool = False,
+        now: datetime | None = None,
     ) -> tuple[int, int]:
         decayed = 0
         forgotten = 0
-        now = datetime.now(UTC)
+        now = now or datetime.now(UTC)
 
         for m in self.db.get_all():
             days = (now - m.updated_at).days
@@ -145,11 +146,11 @@ class SleepEngine:
 
         return decayed, forgotten
 
-    def run_cycle(self, dry_run: bool = False) -> SleepReport:
+    def run_cycle(self, dry_run: bool = False, now: datetime | None = None) -> SleepReport:
         total_before = self.db.count()
         t0 = time.time()
         consolidated = self.consolidate(dry_run=dry_run)
-        decayed, forgotten = self.decay(dry_run=dry_run)
+        decayed, forgotten = self.decay(dry_run=dry_run, now=now)
 
         if self.calibrator and not dry_run:
             self.calibrator.decay_calibrations()
