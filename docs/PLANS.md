@@ -16,6 +16,14 @@
 - 睡眠计算 ✅
 - 数据管理增强 ✅
 
-## V0.3
-- 插件系统
-- 多用户支持
+## V0.3 插件系统 + 多用户（已完成 ✅）
+- EventBus + PluginBase + PluginRegistry ✅
+- 内置示例插件（LoggerPlugin, WebhookPlugin） ✅
+- user_id 行级隔离 ✅
+- API / CLI 多用户支持 ✅
+- 33 新测试（20 plugin + 13 multi_user） ✅
+
+## V1.0（未来路线）
+- 插件 SDK / pip 安装式插件
+- Web 管理控制台
+- 跨设备同步
