@@ -5,7 +5,6 @@ Runs against a REAL running Mneme server (not mocks).
 Tests are FAIL-FAST: first failure stops the suite.
 """
 
-import json
 import subprocess
 import sys
 
