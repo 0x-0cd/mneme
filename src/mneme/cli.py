@@ -350,6 +350,78 @@ def sleep(dry_run: bool, db: str) -> None:
     console.print(f"  Duration:       {report.duration_ms}ms")
 
 
+@cli.command()
+@click.argument("memory_id")
+@click.option("--db", default=_DB_DEFAULT, show_default=True, envvar="MNEME_DB_PATH")
+def patches(memory_id: str, db: str) -> None:
+    """List all patches for a memory."""
+    from mneme.engine.patch import PatchTracker
+
+    db_obj, _vindex, _embed, _store, _searcher = _init_components(db)
+    tracker = PatchTracker(db=db_obj)
+    patches_list = tracker.get_patches(memory_id)
+    if not patches_list:
+        console.print("[yellow]No patches found for this memory.[/yellow]")
+        return
+    table = Table(title=f"Patches for {memory_id[:8]} ({len(patches_list)})")
+    table.add_column("ID", style="dim", no_wrap=True)
+    table.add_column("v→v")
+    table.add_column("Before", no_wrap=False)
+    table.add_column("After", no_wrap=False)
+    table.add_column("Type")
+    table.add_column("Rationale")
+    table.add_column("Created")
+    for p in patches_list:
+        table.add_row(
+            p.id[:8],
+            f"{p.version_from}→{p.version_to}",
+            (p.content_before[:40] or "") + ("..." if len(p.content_before) > 40 else ""),
+            (p.content_after[:40] or "") + ("..." if len(p.content_after) > 40 else ""),
+            f"{p.type_before or '-'}→{p.type_after or '-'}",
+            p.rationale or "",
+            p.created_at.strftime("%Y-%m-%d %H:%M")
+            if hasattr(p.created_at, "strftime")
+            else str(p.created_at),
+        )
+    console.print(table)
+
+
+@cli.command()
+@click.argument("memory_id")
+@click.option("--db", default=_DB_DEFAULT, show_default=True, envvar="MNEME_DB_PATH")
+def history(memory_id: str, db: str) -> None:
+    """Show the full version history of a memory."""
+    from mneme.engine.patch import PatchTracker
+
+    db_obj, _vindex, _embed, _store, _searcher = _init_components(db)
+    tracker = PatchTracker(db=db_obj)
+    history_list = tracker.get_history(memory_id)
+    if not history_list:
+        console.print("[yellow]Memory not found or no history.[/yellow]")
+        return
+    table = Table(title=f"History for {memory_id[:8]} ({len(history_list)})")
+    table.add_column("Version", style="bold")
+    table.add_column("Source")
+    table.add_column("Content", no_wrap=False)
+    table.add_column("Type")
+    table.add_column("Tags")
+    table.add_column("Rationale")
+    for entry in history_list:
+        content = entry.get("content", "") or ""
+        tags_val = entry.get("tags") or []
+        if not isinstance(tags_val, str):
+            tags_val = ",".join(tags_val)
+        table.add_row(
+            str(entry.get("version", "")),
+            entry.get("source", ""),
+            content[:60] + ("..." if len(content) > 60 else ""),
+            str(entry.get("type", "") or "-"),
+            tags_val,
+            entry.get("rationale", "") or "",
+        )
+    console.print(table)
+
+
 # ── Plugin commands ──────────────────────────────────────────────
 
 

@@ -9,6 +9,7 @@ from typing import Any
 from fastapi import FastAPI
 
 from mneme.embed.model import EmbeddingModel
+from mneme.engine.patch import PatchTracker
 from mneme.engine.search import Searcher
 from mneme.engine.sleep import SleepEngine
 from mneme.engine.store import Store
@@ -37,7 +38,15 @@ def create_app(
     _embed = embed or EmbeddingModel()
     event_bus = EventBus()
     calibrator = WeightCalibrator(resolved_path)
-    store = Store(_db, _vindex, _embed, event_bus=event_bus, calibrator=calibrator)
+    patch_tracker = PatchTracker(db=_db)
+    store = Store(
+        _db,
+        _vindex,
+        _embed,
+        event_bus=event_bus,
+        calibrator=calibrator,
+        patch_tracker=patch_tracker,
+    )
     searcher = Searcher(_db, _vindex, _embed)
     plugin_registry = PluginRegistry(bus=event_bus)
 
@@ -51,6 +60,7 @@ def create_app(
     app = FastAPI(title="Mneme", lifespan=lifespan)
     app.state.store = store
     app.state.searcher = searcher
+    app.state.patch_tracker = patch_tracker
     app.state.sleep_engine = SleepEngine(_db, _vindex, _embed, searcher, calibrator=calibrator)
     app.state.sleep_stats = {"last_sleep": None, "last_report": None}
     app.state.event_bus = event_bus

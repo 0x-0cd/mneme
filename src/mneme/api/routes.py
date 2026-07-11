@@ -29,6 +29,7 @@ class UpdateMemoryRequest(BaseModel):
     weight: float | None = None
     metadata: dict[str, Any] | None = None
     user_id: str | None = None
+    rationale: str | None = None
 
 
 @router.post("/v1/memories", status_code=201)
@@ -167,7 +168,7 @@ async def update_memory(memory_id: str, body: UpdateMemoryRequest, req: Request)
     if body.user_id is not None:
         existing.user_id = body.user_id
 
-    store.update(existing)
+    store.update(existing, rationale=body.rationale or "")
     return existing.to_dict()
 
 
@@ -196,6 +197,22 @@ async def clear_memories(req: Request, user_id: str | None = None) -> dict[str, 
 @router.get("/v1/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@router.get("/v1/memories/{memory_id}/patches")
+async def get_memory_patches(memory_id: str, req: Request) -> dict[str, Any]:
+    """Return all patch records for a memory."""
+    patch_tracker = req.app.state.patch_tracker
+    patches = patch_tracker.get_patches(memory_id)
+    return {"patches": [p.to_dict() for p in patches], "total": len(patches)}
+
+
+@router.get("/v1/memories/{memory_id}/history")
+async def get_memory_history(memory_id: str, req: Request) -> dict[str, Any]:
+    """Return the full version history (snapshot + patches + current)."""
+    patch_tracker = req.app.state.patch_tracker
+    history = patch_tracker.get_history(memory_id)
+    return {"history": history}
 
 
 @router.get("/v1/contradictions")
@@ -271,7 +288,10 @@ async def submit_feedback(req: Request, body: FeedbackRequest) -> dict[str, Any]
         raise HTTPException(status_code=422, detail="Could not determine memory type")
 
     result = calibrator.apply_feedback(
-        user_id, mem_type, body.signal, memory_id=body.memory_id,
+        user_id,
+        mem_type,
+        body.signal,
+        memory_id=body.memory_id,
     )
     return {"status": "ok", **result}
 

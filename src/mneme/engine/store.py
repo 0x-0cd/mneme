@@ -12,6 +12,7 @@ from mneme.storage.db import Database
 from mneme.storage.vector import VectorIndex
 
 if TYPE_CHECKING:
+    from mneme.engine.patch import PatchTracker
     from mneme.engine.weight import WeightCalibrator
 
 
@@ -23,18 +24,18 @@ class Store:
         embed: EmbeddingModel,
         event_bus: EventBus | None = None,
         calibrator: WeightCalibrator | None = None,
+        patch_tracker: PatchTracker | None = None,
     ) -> None:
         self.db = db
         self.vindex = vindex
         self.embed = embed
         self.event_bus = event_bus
         self.calibrator = calibrator
+        self.patch_tracker = patch_tracker
 
     def store(self, memory: Memory) -> Memory:
         if self.calibrator is not None and memory.weight == 1.0:
-            effective = self.calibrator.get_effective_weight(
-                memory.user_id, str(memory.type)
-            )
+            effective = self.calibrator.get_effective_weight(memory.user_id, str(memory.type))
             if effective != 1.0:
                 memory.weight = effective
         if self.event_bus:
@@ -57,9 +58,16 @@ class Store:
         if self.event_bus:
             self.event_bus.emit(EventType.AFTER_DELETE, memory_id=memory_id)
 
-    def update(self, memory: Memory) -> Memory:
+    def update(self, memory: Memory, rationale: str = "") -> Memory:
+        old = self.db.get(memory.id)
         if self.event_bus:
             self.event_bus.emit(EventType.BEFORE_UPDATE, memory=memory.to_dict())
+        if (
+            self.patch_tracker is not None
+            and old is not None
+            and self.patch_tracker.should_patch(old, memory)
+        ):
+            self.patch_tracker.create_patch(old, memory, rationale=rationale)
         embedding = self.embed.encode(memory.content)
         if not isinstance(embedding, list):
             embedding = list(embedding)
