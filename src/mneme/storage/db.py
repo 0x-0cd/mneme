@@ -7,7 +7,7 @@ import sqlite3
 from datetime import UTC, datetime
 from typing import Any
 
-from mneme.engine.types import Memory
+from mneme.engine.types import Memory, MemoryPatch
 
 
 class Database:
@@ -43,7 +43,30 @@ class Database:
         self.cursor.execute(
             "CREATE INDEX IF NOT EXISTS idx_memories_deleted ON memories(deleted_at)"
         )
+        self._initialize_patches_table()
         self.conn.commit()
+
+    def _initialize_patches_table(self) -> None:
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS memory_patches (
+                id              TEXT PRIMARY KEY,
+                memory_id       TEXT NOT NULL,
+                version_from    INTEGER NOT NULL,
+                version_to      INTEGER NOT NULL,
+                content_before  TEXT NOT NULL,
+                content_after   TEXT NOT NULL,
+                type_before     TEXT,
+                type_after      TEXT,
+                tags_before     TEXT,
+                tags_after      TEXT,
+                rationale       TEXT NOT NULL DEFAULT "",
+                created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY (memory_id) REFERENCES memories(id)
+            )
+        """)
+        self.cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_patches_memory_id ON memory_patches(memory_id)"
+        )
 
     def close(self) -> None:
         if hasattr(self, "conn") and self.conn:
@@ -143,6 +166,35 @@ class Database:
             ),
         )
         self.conn.commit()
+
+    def insert_patch(self, patch: MemoryPatch) -> None:
+        row = patch.to_dict()
+        row["created_at"] = (
+            row["created_at"]
+            if isinstance(row["created_at"], str)
+            else patch.created_at.isoformat()
+        )
+        self.cursor.execute(
+            """INSERT INTO memory_patches
+               (id, memory_id, version_from, version_to,
+                content_before, content_after,
+                type_before, type_after, tags_before, tags_after,
+                rationale, created_at)
+               VALUES (:id, :memory_id, :version_from, :version_to,
+                       :content_before, :content_after,
+                       :type_before, :type_after, :tags_before, :tags_after,
+                       :rationale, :created_at)""",
+            row,
+        )
+        self.conn.commit()
+
+    def get_patches(self, memory_id: str) -> list[MemoryPatch]:
+        rows = self.cursor.execute(
+            "SELECT * FROM memory_patches WHERE memory_id = ?"
+            " ORDER BY created_at ASC, version_to ASC",
+            (memory_id,),
+        ).fetchall()
+        return [MemoryPatch.from_dict(dict(r)) for r in rows]
 
     def soft_delete(self, memory_id: str) -> None:
         now = datetime.now(UTC).isoformat()

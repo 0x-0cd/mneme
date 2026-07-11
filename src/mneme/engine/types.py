@@ -62,3 +62,38 @@ class Memory:
             if key in clean and isinstance(clean[key], str):
                 clean[key] = datetime.fromisoformat(clean[key])
         return cls(**clean)
+
+
+@dataclass
+class MemoryPatch:
+    """Structured record of a non-incremental memory update (overwrite/rewrite)."""
+
+    id: str
+    memory_id: str
+    version_from: int
+    version_to: int
+    content_before: str
+    content_after: str
+    type_before: str | None = None
+    type_after: str | None = None
+    tags_before: str | None = None
+    tags_after: str | None = None
+    rationale: str = ""
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+
+    def to_dict(self) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for f in self.__dataclass_fields__:
+            val = getattr(self, f)
+            if isinstance(val, datetime):
+                result[f] = val.isoformat()
+            else:
+                result[f] = val
+        return result
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> MemoryPatch:
+        clean = dict(data)
+        if "created_at" in clean and isinstance(clean["created_at"], str):
+            clean["created_at"] = datetime.fromisoformat(clean["created_at"])
+        return cls(**clean)
