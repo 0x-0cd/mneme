@@ -128,3 +128,29 @@ class TestStats:
         result = runner.invoke(cli, ["stats", "--db", db_path])
         assert result.exit_code == 0
         assert "Total memories: 3" in result.output
+
+
+class TestPatchesAndHistoryCli:
+    @staticmethod
+    def _add_and_get_id(runner, db_path, content="orig"):
+        r = runner.invoke(cli, ["add", content, "--db", db_path])
+        data = ast.literal_eval(r.output.strip())
+        return data["id"]
+
+    def test_patches_empty_returns_no_patches(self, runner, db_path):
+        mem_id = self._add_and_get_id(runner, db_path)
+        result = runner.invoke(cli, ["patches", mem_id, "--db", db_path])
+        assert result.exit_code == 0
+        assert "No patches" in result.output
+
+    def test_history_shows_current_when_no_patches(self, runner, db_path):
+        mem_id = self._add_and_get_id(runner, db_path, content="hello")
+        result = runner.invoke(cli, ["history", mem_id, "--db", db_path])
+        assert result.exit_code == 0
+        assert "hello" in result.output
+        assert "current" in result.output
+
+    def test_history_unknown_memory(self, runner, db_path):
+        result = runner.invoke(cli, ["history", "nonexistent", "--db", db_path])
+        assert result.exit_code == 0
+        assert "no history" in result.output.lower() or "not found" in result.output.lower()

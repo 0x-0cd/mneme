@@ -167,3 +167,54 @@ class TestHealthAndStats:
         data = resp.json()
         assert "total" in data
         assert "by_type" in data
+
+
+class TestPatchesAndHistory:
+    async def test_update_with_rationale_creates_patch(self, client, sample_memory_id) -> None:
+        resp = await client.put(
+            f"/v1/memories/{sample_memory_id}",
+            json={"content": "rewritten content", "rationale": "correction"},
+        )
+        assert resp.status_code == 200
+        patch_resp = await client.get(f"/v1/memories/{sample_memory_id}/patches")
+        assert patch_resp.status_code == 200
+        data = patch_resp.json()
+        assert data["total"] == 1
+        patch = data["patches"][0]
+        assert patch["content_before"] == "hello world"
+        assert patch["content_after"] == "rewritten content"
+        assert patch["rationale"] == "correction"
+
+    async def test_tags_only_update_creates_no_patch(self, client, sample_memory_id) -> None:
+        await client.put(
+            f"/v1/memories/{sample_memory_id}",
+            json={"tags": ["only-tags"]},
+        )
+        resp = await client.get(f"/v1/memories/{sample_memory_id}/patches")
+        assert resp.json()["total"] == 0
+
+    async def test_get_history(self, client, sample_memory_id) -> None:
+        await client.put(
+            f"/v1/memories/{sample_memory_id}",
+            json={"content": "v2", "rationale": "first"},
+        )
+        await client.put(
+            f"/v1/memories/{sample_memory_id}",
+            json={"content": "v3", "rationale": "second"},
+        )
+        resp = await client.get(f"/v1/memories/{sample_memory_id}/history")
+        assert resp.status_code == 200
+        history = resp.json()["history"]
+        # snapshot + 2 patches
+        assert len(history) == 3
+        assert history[0]["source"] == "snapshot"
+        assert history[0]["content"] == "hello world"
+        assert history[1]["source"] == "patch"
+        assert history[1]["content"] == "v2"
+        assert history[2]["source"] == "patch"
+        assert history[2]["content"] == "v3"
+
+    async def test_patches_empty_for_unknown(self, client) -> None:
+        resp = await client.get("/v1/memories/nonexistent/patches")
+        assert resp.status_code == 200
+        assert resp.json() == {"patches": [], "total": 0}
